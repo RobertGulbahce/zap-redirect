@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sending to Zapier...</title>
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const metric = params.get("metric");
+      const user = params.get("user");
+
+      // Send webhook to Zapier
+      fetch("https://hooks.zapier.com/hooks/catch/395556/2ncbzdz/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          metric: metric,
+          user: user,
+          timestamp: new Date().toISOString()
+        })
+      }).catch(() => {});
+
+      // Redirect to a clean page
+      setTimeout(() => {
+        window.location.href = "https://yourdomain.com/thanks"; // Change this if needed
+      }, 300);
+    })();
+  </script>
+</head>
+<body>
+  Sending to Slack...
+</body>
+</html>
