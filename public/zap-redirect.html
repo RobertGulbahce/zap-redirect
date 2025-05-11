@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Sending to Zapier...</title>
+  <title>Sending to Slack...</title>
   <script>
     (function () {
       const params = new URLSearchParams(window.location.search);
@@ -19,9 +19,9 @@
         })
       }).catch(() => {});
 
-      // Redirect to a clean page
+      // Replace page with confirmation message
       setTimeout(() => {
-        window.location.href = "https://yourdomain.com/thanks";
+        document.body.innerHTML = "<h2>Done!</h2><p>Your Slack notification has been sent.</p>";
       }, 300);
     })();
   </script>
