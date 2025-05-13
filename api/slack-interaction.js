@@ -32,45 +32,65 @@ export default async function handler(req, res) {
         slack_id: payload.user.id,
         thread_ts: privateMetadata.thread_ts || null,
         channel: privateMetadata.channel || null,
-        chart_url: privateMetadata.chart_url || '',
         timestamp: new Date().toISOString()
       };
 
+      // Send to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
+      // Post to thread
       if (privateMetadata.channel && privateMetadata.thread_ts) {
-        const dateStr = new Date().toLocaleDateString('en-AU', {
-          day: '2-digit', month: 'short', year: 'numeric'
+        const message = {
+          channel: privateMetadata.channel,
+          thread_ts: privateMetadata.thread_ts,
+          text: `\uD83D\uDCDD Plan submitted for \"${submitted.title}\"`,
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `\uD83D\uDCDD *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
+              }
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text:
+`*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
+              }
+            }
+          ]
+        };
+
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(message)
         });
 
-        // Update original message with confirmation at the bottom and remove buttons
-        const updatedBlocks = [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `Here's today’s *${submitted.title}* report:`
-            }
-          },
-          {
-            type: "image",
-            image_url: submitted.chart_url,
-            alt_text: `${submitted.title} chart`
-          },
-          {
-            type: "context",
-            elements: [
-              {
+        // Update original message
+        const updatePayload = {
+          channel: privateMetadata.channel,
+          ts: privateMetadata.thread_ts,
+          text: `\uD83D\uDE80 Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`,
+          blocks: [
+            {
+              type: "section",
+              text: {
                 type: "mrkdwn",
-                text: `🚀 Challenge accepted by <@${submitted.slack_id}> on ${dateStr}`
+                text: `\uD83D\uDE80 Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
               }
-            ]
-          }
-        ];
+            }
+          ]
+        };
 
         await fetch("https://slack.com/api/chat.update", {
           method: "POST",
@@ -78,12 +98,7 @@ export default async function handler(req, res) {
             Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({
-            channel: privateMetadata.channel,
-            ts: privateMetadata.thread_ts,
-            text: `Here's today’s ${submitted.title} report`,
-            blocks: updatedBlocks
-          })
+          body: JSON.stringify(updatePayload)
         });
       }
 
@@ -110,8 +125,7 @@ export default async function handler(req, res) {
         period: data.period,
         target: data.target,
         baseline: data.baseline,
-        owner: data.owner,
-        chart_url: data.chart_url || ''
+        owner: data.owner
       });
 
       const modal = {
@@ -124,13 +138,7 @@ export default async function handler(req, res) {
           submit: { type: "plain_text", text: "Submit" },
           close: { type: "plain_text", text: "Cancel" },
           blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
-              }
-            },
+            { type: "section", text: { type: "mrkdwn", text: "\uD83D\uDC4B Let’s take a moment to reflect on this result and set your focus for the week ahead." } },
             { type: "context", elements: [{ type: "mrkdwn", text: `*Objective Title:* ${data.title}` }] },
             { type: "context", elements: [{ type: "mrkdwn", text: `*Focus:* ${data.labels}` }] },
             { type: "context", elements: [{ type: "mrkdwn", text: `*Current Result:* ${data.results}` }] },
@@ -201,4 +209,4 @@ export default async function handler(req, res) {
     console.error("❌ Slack handler error:", err);
     return res.status(500).json({ error: 'Internal Server Error', detail: err.message });
   }
-}
+} 
