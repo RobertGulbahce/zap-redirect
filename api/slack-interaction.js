@@ -157,7 +157,7 @@ export default async function handler(req, res) {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
+                text: "Let’s take a moment to reflect on this result and set your focus for the week ahead."
               }
             },
             { type: "context", elements: [{ type: "mrkdwn", text: `*Objective Title:* ${data.title}` }] },
