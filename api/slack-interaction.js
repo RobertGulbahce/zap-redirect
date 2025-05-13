@@ -42,28 +42,53 @@ export default async function handler(req, res) {
       });
 
       if (privateMetadata.channel && privateMetadata.thread_ts) {
+        const dateStr = new Date().toLocaleDateString('en-AU', {
+          day: '2-digit', month: 'short', year: 'numeric'
+        });
+
+        // Post to thread with confirmation message
         const message = {
           channel: privateMetadata.channel,
           thread_ts: privateMetadata.thread_ts,
-          text: `📝 Plan submitted for \"${submitted.title}\"`,
+          text: `🚀 Challenge accepted by <@${submitted.slack_id}> on ${dateStr}`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `📝 *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
-              }
-            },
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text:
-`*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
+                text: `🚀 *Challenge accepted by <@${submitted.slack_id}> on ${dateStr}*`
               }
             }
           ]
         };
+
+        // Remove button from original message
+        await fetch("https://slack.com/api/chat.update", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            channel: privateMetadata.channel,
+            ts: privateMetadata.thread_ts,
+            text: `Here's today's ${submitted.title} report:`,
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `Here's today’s *${submitted.title}* report:`
+                }
+              },
+              {
+                type: "image",
+                image_url: privateMetadata.chart_url || '',
+                alt_text: `${submitted.title} chart`
+              }
+            ]
+          })
+        });
 
         await fetch("https://slack.com/api/chat.postMessage", {
           method: "POST",
@@ -81,7 +106,6 @@ export default async function handler(req, res) {
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
 
-      // Only respond to start_plan button
       if (action.action_id !== 'start_plan') {
         return res.status(200).end();
       }
@@ -99,7 +123,8 @@ export default async function handler(req, res) {
         period: data.period,
         target: data.target,
         baseline: data.baseline,
-        owner: data.owner
+        owner: data.owner,
+        chart_url: data.chart_url || ''
       });
 
       const modal = {
