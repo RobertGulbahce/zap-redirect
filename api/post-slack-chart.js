@@ -31,7 +31,7 @@ export default async function handler(req, res) {
               action_id: "start_plan",
               text: {
                 type: "plain_text",
-                text: "🗘️ Plan My Actions",
+                text: "📝 Plan My Actions",
                 emoji: true
               },
               value: "placeholder"
