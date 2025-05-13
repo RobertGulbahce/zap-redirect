@@ -1,41 +1,26 @@
-// File: /api/post-slack-chart.js
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
 
   try {
-    const {
-      owner,
-      user,
-      row,
-      labels,
-      results,
-      target,
-      baseline,
-      title,
-      period,
-      timestamp,
-      chart_url, // You must pass this from Zapier
-      channel = "C08QXCVUH6Y"
-    } = req.body;
+    const data = req.body;
 
     const payload = {
-      channel,
-      text: `Here's today's ${title} report:`,
+      channel: "C08QXCVUH6Y",
+      text: `Here's today's ${data.title} report:`,
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `Here's today's *${title}* report:`
+            text: `Here's today's *${data.title}* report:`
           }
         },
         {
           type: "image",
-          image_url: chart_url,
-          alt_text: `${title} chart`
+          image_url: data.chart_url,
+          alt_text: `${data.title} chart`
         },
         {
           type: "actions",
@@ -49,16 +34,16 @@ export default async function handler(req, res) {
                 emoji: true
               },
               value: JSON.stringify({
-                owner,
-                user,
-                row,
-                labels,
-                results,
-                target,
-                baseline,
-                title,
-                period,
-                timestamp
+                owner: data.owner,
+                user: data.user,
+                row: data.row,
+                labels: data.labels,
+                results: data.results,
+                target: data.target,
+                baseline: data.baseline,
+                title: data.title,
+                period: data.period,
+                timestamp: data.timestamp
               })
             }
           ]
@@ -76,11 +61,19 @@ export default async function handler(req, res) {
     });
 
     const slackData = await slackRes.json();
-    if (!slackData.ok) throw new Error(slackData.error);
 
-    return res.status(200).json({ ok: true, slack_ts: slackData.ts });
+    if (!slackData.ok) {
+      throw new Error(`Slack API error: ${slackData.error}`);
+    }
+
+    return res.status(200).json({
+      ok: true,
+      channel: slackData.channel,
+      ts: slackData.ts,
+      message: "Chart sent to Slack."
+    });
   } catch (err) {
-    console.error("Failed to post to Slack:", err);
-    return res.status(500).json({ error: err.message });
+    console.error("Error posting to Slack:", err);
+    return res.status(500).json({ error: "Internal Server Error", detail: err.message });
   }
 }
