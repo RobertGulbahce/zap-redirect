@@ -1,5 +1,3 @@
-// Part 1/2: slack-interaction.js
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
@@ -53,8 +51,42 @@ export default async function handler(req, res) {
           blocks: [
             {
               type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `📝 *Plan submitted for \"${submitted.title}\"*
+*Focus:* ${submitted.labels}
+*Current Result:* ${submitted.result}
+*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}
+*Period:* ${submitted.period}`
+              }
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `*Goal:* ${submitted.goal || "–"}
+*Reasoning:* ${submitted.reasoning || "–"}
+*Who else:* ${submitted.involvement || "–"}
+*Next move:* ${submitted.next_move || "–"}
+*Ownership vision:* ${submitted.ownership_vision || "–"}
+*Confidence:* ${submitted.confidence || "–"}`
+              }
+            }
+          ]
+        };
 
-              // Part 2/2: continuation of slack-interaction.js (modal with context blocks)
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(message)
+        });
+      }
+
+      return res.status(200).json({ response_action: 'clear' });
+    }
 
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
@@ -93,115 +125,54 @@ export default async function handler(req, res) {
                 text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
               }
             },
-            {
-              type: "context",
-              elements: [{ type: "mrkdwn", text: `*Objective Title:* ${data.title}` }]
-            },
-            {
-              type: "context",
-              elements: [{ type: "mrkdwn", text: `*Focus:* ${data.labels}` }]
-            },
-            {
-              type: "context",
-              elements: [{ type: "mrkdwn", text: `*Current Result:* ${data.results}` }]
-            },
-            {
-              type: "context",
-              elements: [{ type: "mrkdwn", text: `*Period:* ${data.period}` }]
-            },
-            {
-              type: "context",
-              elements: [{ type: "mrkdwn", text: `*Target:* ${data.target}` }]
-            },
-            {
-              type: "context",
-              elements: [{ type: "mrkdwn", text: `*Baseline:* ${data.baseline}` }]
-            },
-            {
-              type: "context",
-              elements: [{ type: "mrkdwn", text: `*Who owns this Objective?:* ${data.owner}` }]
-            },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Objective Title:* ${data.title}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Focus:* ${data.labels}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Current Result:* ${data.results}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Period:* ${data.period}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Target:* ${data.target}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Baseline:* ${data.baseline}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Who owns this Objective?:* ${data.owner}` }] },
             {
               type: "input",
               block_id: "goal_shortterm_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "What’s your goal for this result in the short term?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "goal_shortterm_input"
-              }
+              label: { type: "plain_text", text: "What’s your goal for this result in the short term?" },
+              element: { type: "plain_text_input", action_id: "goal_shortterm_input" }
             },
             {
               type: "input",
               block_id: "reasoning_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "What’s your current theory for why this result is where it is?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "reasoning_input",
-                multiline: true
-              }
+              label: { type: "plain_text", text: "What’s your current theory for why this result is where it is?" },
+              element: { type: "plain_text_input", action_id: "reasoning_input", multiline: true }
             },
             {
               type: "input",
               block_id: "involvement_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "Who else needs to be involved or brought into focus here?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "involvement_input",
-                multiline: true
-              }
+              label: { type: "plain_text", text: "Who else needs to be involved or brought into focus here?" },
+              element: { type: "plain_text_input", action_id: "involvement_input", multiline: true }
             },
             {
               type: "input",
               block_id: "next_move_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "What’s one move you could make this week to support this result?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "next_move_input",
-                multiline: true
-              }
+              label: { type: "plain_text", text: "What’s one move you could make this week to support this result?" },
+              element: { type: "plain_text_input", action_id: "next_move_input", multiline: true }
             },
             {
               type: "input",
               block_id: "ownership_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "What would ‘10/10 ownership’ of this result look like from you right now?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "ownership_input",
-                multiline: true
-              }
+              label: { type: "plain_text", text: "What would ‘10/10 ownership’ of this result look like from you right now?" },
+              element: { type: "plain_text_input", action_id: "ownership_input", multiline: true }
             },
             {
               type: "input",
               block_id: "confidence_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "On a scale of 1–10, how confident are you that this result will improve?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "confidence_input"
-              }
+              label: { type: "plain_text", text: "On a scale of 1–10, how confident are you that this result will improve?" },
+              element: { type: "plain_text_input", action_id: "confidence_input" }
             }
           ]
         }
@@ -210,12 +181,12 @@ export default async function handler(req, res) {
       await fetch("https://slack.com/api/views.open", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+          Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,  
           "Content-Type": "application/json"
         },
         body: JSON.stringify(modal)
       });
- }
+
       return res.status(200).json({ response_action: 'clear' });
     }
 
