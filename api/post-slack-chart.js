@@ -4,76 +4,242 @@ export default async function handler(req, res) {
   }
 
   try {
-    const data = req.body;
+    const payload = req.body.payload ? JSON.parse(req.body.payload) : {};
 
-    const payload = {
-      channel: "C08QXCVUH6Y",
-      text: `Here's today's ${data.title} report:`,
-      blocks: [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `Here's today's *${data.title}* report:`
-          }
-        },
-        {
-          type: "image",
-          image_url: data.chart_url,
-          alt_text: `${data.title} chart`
-        },
-        {
-          type: "actions",
-          elements: [
+    // Handle modal submission
+    if (payload.type === 'view_submission') {
+      const values = payload.view.state.values;
+      const privateMetadata = JSON.parse(payload.view.private_metadata || '{}');
+
+      const extract = (blockId, actionId) =>
+        values[blockId]?.[actionId]?.value || "";
+
+      const submitted = {
+        goal: extract("goal_shortterm_block", "goal_shortterm_input"),
+        reasoning: extract("reasoning_block", "reasoning_input"),
+        involvement: extract("involvement_block", "involvement_input"),
+        next_move: extract("next_move_block", "next_move_input"),
+        ownership_vision: extract("ownership_block", "ownership_input"),
+        confidence: extract("confidence_block", "confidence_input"),
+        title: privateMetadata.title,
+        labels: privateMetadata.labels,
+        result: privateMetadata.results,
+        period: privateMetadata.period,
+        target: privateMetadata.target,
+        baseline: privateMetadata.baseline,
+        owner: privateMetadata.owner,
+        from_modal: true,
+        slack_user: payload.user.username,
+        slack_id: payload.user.id,
+        thread_ts: privateMetadata.thread_ts || null,
+        channel: privateMetadata.channel || null,
+        chart_url: privateMetadata.chart_url || null,
+        ts: privateMetadata.ts || null,
+        timestamp: new Date().toISOString()
+      };
+
+      // Send data to Zapier
+      await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(submitted)
+      });
+
+      // Post confirmation in thread
+      if (submitted.channel && submitted.thread_ts) {
+        const threadMessage = {
+          channel: submitted.channel,
+          thread_ts: submitted.thread_ts,
+          text: `📝 Plan submitted for "${submitted.title}"`,
+          blocks: [
             {
-              type: "button",
-              action_id: "start_plan",
+              type: "section",
               text: {
-                type: "plain_text",
-                text: "📝 Plan My Actions",
-                emoji: true
-              },
-              value: JSON.stringify({
-                owner: data.owner,
-                user: data.user,
-                row: data.row,
-                labels: data.labels,
-                results: data.results,
-                target: data.target,
-                baseline: data.baseline,
-                title: data.title,
-                period: data.period,
-                timestamp: data.timestamp
-              })
+                type: "mrkdwn",
+                text: `📝 *Plan submitted for "${submitted.title}"*
+*Focus:* ${submitted.labels}
+*Current Result:* ${submitted.result}
+*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}
+*Period:* ${submitted.period}`
+              }
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text:
+`*Goal:* ${submitted.goal || "–"}
+*Reasoning:* ${submitted.reasoning || "–"}
+*Who else:* ${submitted.involvement || "–"}
+*Next move:* ${submitted.next_move || "–"}
+*Ownership vision:* ${submitted.ownership_vision || "–"}
+*Confidence:* ${submitted.confidence || "–"}`
+              }
+            }
+          ]
+        };
+
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(threadMessage)
+        });
+
+        // Update original message to remove button and add confirmation
+        const updateMain = {
+          channel: submitted.channel,
+          ts: submitted.ts,
+          text: `Here's today's ${submitted.title} report:`,
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `Here's today's *${submitted.title}* report:`
+              }
+            },
+            {
+              type: "image",
+              image_url: submitted.chart_url || "https://via.placeholder.com/600x300?text=Chart",
+              alt_text: `${submitted.title} chart`
+            },
+            {
+              type: "context",
+              elements: [
+                {
+                  type: "mrkdwn",
+                  text: `:rocket: Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
+                }
+              ]
+            }
+          ]
+        };
+
+        await fetch("https://slack.com/api/chat.update", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(updateMain)
+        });
+      }
+
+      return res.status(200).json({ response_action: 'clear' });
+    }
+
+    // Handle button click
+    if (payload.type === 'block_actions') {
+      const action = payload.actions[0];
+      if (action.action_id !== 'start_plan') return res.status(200).end();
+
+      const data = JSON.parse(action.value || '{}');
+      const thread_ts = payload.container?.message_ts;
+      const channel = payload.container?.channel_id;
+      const ts = payload.container?.message_ts; // Capture original message timestamp
+
+      const private_metadata = JSON.stringify({
+        thread_ts,
+        channel,
+        ts, // Send ts for message update
+        title: data.title,
+        labels: data.labels,
+        results: data.results,
+        period: data.period,
+        target: data.target,
+        baseline: data.baseline,
+        owner: data.owner,
+        chart_url: data.chart_url || ""
+      });
+
+      const modal = {
+        trigger_id: payload.trigger_id,
+        view: {
+          type: "modal",
+          callback_id: "weekly_plan_modal",
+          private_metadata,
+          title: { type: "plain_text", text: "Weekly Plan" },
+          submit: { type: "plain_text", text: "Submit" },
+          close: { type: "plain_text", text: "Cancel" },
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
+              }
+            },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Objective Title:* ${data.title}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Focus:* ${data.labels}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Current Result:* ${data.results}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Period:* ${data.period}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Target:* ${data.target}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Baseline:* ${data.baseline}` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `*Who owns this Objective?:* ${data.owner}` }] },
+            {
+              type: "input",
+              block_id: "goal_shortterm_block",
+              optional: true,
+              label: { type: "plain_text", text: "What’s your goal for this result in the short term?" },
+              element: { type: "plain_text_input", action_id: "goal_shortterm_input" }
+            },
+            {
+              type: "input",
+              block_id: "reasoning_block",
+              optional: true,
+              label: { type: "plain_text", text: "What’s your current theory for why this result is where it is?" },
+              element: { type: "plain_text_input", action_id: "reasoning_input", multiline: true }
+            },
+            {
+              type: "input",
+              block_id: "involvement_block",
+              optional: true,
+              label: { type: "plain_text", text: "Who else needs to be involved or brought into focus here?" },
+              element: { type: "plain_text_input", action_id: "involvement_input", multiline: true }
+            },
+            {
+              type: "input",
+              block_id: "next_move_block",
+              optional: true,
+              label: { type: "plain_text", text: "What’s one move you could make this week to support this result?" },
+              element: { type: "plain_text_input", action_id: "next_move_input", multiline: true }
+            },
+            {
+              type: "input",
+              block_id: "ownership_block",
+              optional: true,
+              label: { type: "plain_text", text: "What would ‘10/10 ownership’ of this result look like from you right now?" },
+              element: { type: "plain_text_input", action_id: "ownership_input", multiline: true }
+            },
+            {
+              type: "input",
+              block_id: "confidence_block",
+              optional: true,
+              label: { type: "plain_text", text: "On a scale of 1–10, how confident are you that this result will improve?" },
+              element: { type: "plain_text_input", action_id: "confidence_input" }
             }
           ]
         }
-      ]
-    };
+      };
 
-    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
+      await fetch("https://slack.com/api/views.open", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(modal)
+      });
 
-    const slackData = await slackRes.json();
-
-    if (!slackData.ok) {
-      throw new Error(`Slack API error: ${slackData.error}`);
+      return res.status(200).end();
     }
 
-    return res.status(200).json({
-      ok: true,
-      channel: slackData.channel,
-      ts: slackData.ts,
-      message: "Chart sent to Slack."
-    });
+    return res.status(200).end();
   } catch (err) {
-    console.error("Error posting to Slack:", err);
-    return res.status(500).json({ error: "Internal Server Error", detail: err.message });
+    console.error("❌ Slack handler error:", err);
+    return res.status(500).json({ error: 'Internal Server Error', detail: err.message });
   }
 }
