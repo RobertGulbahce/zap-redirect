@@ -6,6 +6,7 @@ export default async function handler(req, res) {
   try {
     const payload = req.body.payload ? JSON.parse(req.body.payload) : {};
 
+    // Handle modal submission
     if (payload.type === 'view_submission') {
       const values = payload.view.state.values;
       const privateMetadata = JSON.parse(payload.view.private_metadata || '{}');
@@ -35,32 +36,33 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString()
       };
 
-      // 🔁 Send to Zapier
+      // Send data to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
-      // 💬 Post confirmation message in thread
-      if (privateMetadata.channel && privateMetadata.thread_ts) {
+      // Post confirmation in thread
+      if (submitted.channel && submitted.thread_ts) {
         const threadMessage = {
-          channel: privateMetadata.channel,
-          thread_ts: privateMetadata.thread_ts,
-          text: `📝 Plan submitted for "${submitted.title}"`,
+          channel: submitted.channel,
+          thread_ts: submitted.thread_ts,
+          text: `\uD83D\uDCDD Plan submitted for \"${submitted.title}\"`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `📝 *Plan submitted for "${submitted.title}"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
+                text: `\uD83D\uDCDD *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
               }
             },
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
+                text:
+`*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
               }
             }
           ]
@@ -75,22 +77,22 @@ export default async function handler(req, res) {
           body: JSON.stringify(threadMessage)
         });
 
-        // 🧼 Update parent message to remove buttons and show acknowledgement
-        const updateMessage = {
-          channel: privateMetadata.channel,
-          ts: privateMetadata.thread_ts,
-          text: `Here's today’s ${submitted.title} report:`,
+        // Update main message to remove button and show confirmation
+        const updateMain = {
+          channel: submitted.channel,
+          ts: submitted.thread_ts,
+          text: `Here's today's ${submitted.title} report:`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `Here's today’s *${submitted.title}* report:`
+                text: `Here's today's *${submitted.title}* report:`
               }
             },
             {
               type: "image",
-              image_url: privateMetadata.chart_url,
+              image_url: privateMetadata.chart_url || "https://via.placeholder.com/600x300?text=Chart",
               alt_text: `${submitted.title} chart`
             },
             {
@@ -98,7 +100,7 @@ export default async function handler(req, res) {
               elements: [
                 {
                   type: "mrkdwn",
-                  text: `🚀 Challenge accepted by <@${payload.user.id}> on ${new Date().toLocaleDateString("en-AU")}`
+                  text: `:rocket: Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
                 }
               ]
             }
@@ -111,13 +113,14 @@ export default async function handler(req, res) {
             Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify(updateMessage)
+          body: JSON.stringify(updateMain)
         });
       }
 
       return res.status(200).json({ response_action: 'clear' });
     }
 
+    // Handle button click
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
       if (action.action_id !== 'start_plan') return res.status(200).end();
@@ -136,7 +139,7 @@ export default async function handler(req, res) {
         target: data.target,
         baseline: data.baseline,
         owner: data.owner,
-        chart_url: data.chart_url
+        chart_url: data.chart_url || ""
       });
 
       const modal = {
@@ -153,7 +156,7 @@ export default async function handler(req, res) {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
+                text: "\uD83D\uDC4B Let’s take a moment to reflect on this result and set your focus for the week ahead."
               }
             },
             { type: "context", elements: [{ type: "mrkdwn", text: `*Objective Title:* ${data.title}` }] },
@@ -218,7 +221,7 @@ export default async function handler(req, res) {
         body: JSON.stringify(modal)
       });
 
-      return res.status(200).json({ ok: true });
+      return res.status(200).end();
     }
 
     return res.status(200).end();
