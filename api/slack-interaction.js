@@ -45,14 +45,28 @@ export default async function handler(req, res) {
         const updateMessage = {
           channel: privateMetadata.channel,
           ts: privateMetadata.thread_ts,
-          text: `🚀 Challenge accepted by <@${submitted.slack_id}>`,
+          text: `Here's today's ${submitted.title} report:`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `🚀 *Challenge accepted by <@${submitted.slack_id}>*`
+                text: `Here's today's *${submitted.title}* report:`
               }
+            },
+            {
+              type: "image",
+              image_url: submitted.image_url || "https://via.placeholder.com/600x300?text=Chart",
+              alt_text: `${submitted.title} chart`
+            },
+            {
+              type: "context",
+              elements: [
+                {
+                  type: "mrkdwn",
+                  text: `🚀 *Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}*`
+                }
+              ]
             }
           ]
         };
