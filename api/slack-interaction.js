@@ -36,25 +36,23 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString()
       };
 
-      // Send data to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
-      // Post confirmation in thread
       if (submitted.channel && submitted.thread_ts) {
         const threadMessage = {
           channel: submitted.channel,
           thread_ts: submitted.thread_ts,
-          text: `\uD83D\uDCDD Plan submitted for \"${submitted.title}\"`,
+          text: `📝 Plan submitted for \"${submitted.title}\"`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `\uD83D\uDCDD *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
+                text: `📝 *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
               }
             },
             {
@@ -77,7 +75,7 @@ export default async function handler(req, res) {
           body: JSON.stringify(threadMessage)
         });
 
-        // Update main message to remove button and show confirmation
+        // Update chart message
         const updateMain = {
           channel: submitted.channel,
           ts: submitted.thread_ts,
@@ -100,7 +98,7 @@ export default async function handler(req, res) {
               elements: [
                 {
                   type: "mrkdwn",
-                  text: `:rocket: Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
+                  text: `:rocket: Challenge accepted by <@${submitted.slack_id}> on *${new Date().toLocaleDateString("en-AU")}*`
                 }
               ]
             }
@@ -120,7 +118,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ response_action: 'clear' });
     }
 
-    // Handle button click
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
       if (action.action_id !== 'start_plan') return res.status(200).end();
@@ -156,7 +153,7 @@ export default async function handler(req, res) {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: "\uD83D\uDC4B Let’s take a moment to reflect on this result and set your focus for the week ahead."
+                text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
               }
             },
             { type: "context", elements: [{ type: "mrkdwn", text: `*Objective Title:* ${data.title}` }] },
