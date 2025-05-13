@@ -6,19 +6,19 @@ export default async function handler(req, res) {
   try {
     const payload = req.body.payload ? JSON.parse(req.body.payload) : {};
 
-    // 🔁 Modal Submission Handling
+    // Handle modal submission
     if (payload.type === 'view_submission') {
       const values = payload.view.state.values;
-
       const extract = (blockId, actionId) =>
         values[blockId]?.[actionId]?.value || "";
 
       const submitted = {
         title: extract("title_block", "title_input"),
+        labels: extract("labels_block", "labels_input"),
         result: extract("result_block", "result_input"),
+        period: extract("period_block", "period_input"),
         target: extract("target_block", "target_input"),
         baseline: extract("baseline_block", "baseline_input"),
-        period: extract("period_block", "period_input"),
         owner: extract("owner_block", "owner_input"),
         goal: extract("goal_shortterm_block", "goal_shortterm_input"),
         reasoning: extract("reasoning_block", "reasoning_input"),
@@ -32,17 +32,16 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString()
       };
 
-      // 🔁 Send to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
-      return res.status(200).json({ response_action: 'clear' }); // Close modal
+      return res.status(200).json({ response_action: 'clear' });
     }
 
-    // 🧠 Button Interaction Handling
+    // Handle button click
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
       const actionId = action.action_id;
@@ -50,7 +49,6 @@ export default async function handler(req, res) {
       const userId = payload.user.id;
       const username = payload.user.username;
 
-      // 🔁 Send data to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,7 +61,6 @@ export default async function handler(req, res) {
         })
       });
 
-      // ✅ Confirmation message
       const confirmation = {
         response_action: "update",
         blocks: [
@@ -77,7 +74,6 @@ export default async function handler(req, res) {
         ]
       };
 
-      // 📝 Launch Modal (if applicable)
       if (actionId === "start_plan") {
         const modal = {
           trigger_id: payload.trigger_id,
@@ -89,13 +85,31 @@ export default async function handler(req, res) {
             close: { type: "plain_text", text: "Cancel" },
             blocks: [
               {
+                type: "section",
+                block_id: "intro_block",
+                text: {
+                  type: "mrkdwn",
+                  text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
+                }
+              },
+              {
                 type: "input",
                 block_id: "title_block",
-                label: { type: "plain_text", text: "Title" },
+                label: { type: "plain_text", text: "Objective Title" },
                 element: {
                   type: "plain_text_input",
                   action_id: "title_input",
                   initial_value: data.title || ""
+                }
+              },
+              {
+                type: "input",
+                block_id: "labels_block",
+                label: { type: "plain_text", text: "Focus" },
+                element: {
+                  type: "plain_text_input",
+                  action_id: "labels_input",
+                  initial_value: data.labels || ""
                 }
               },
               {
@@ -106,6 +120,16 @@ export default async function handler(req, res) {
                   type: "plain_text_input",
                   action_id: "result_input",
                   initial_value: data.results || ""
+                }
+              },
+              {
+                type: "input",
+                block_id: "period_block",
+                label: { type: "plain_text", text: "Period" },
+                element: {
+                  type: "plain_text_input",
+                  action_id: "period_input",
+                  initial_value: data.period || ""
                 }
               },
               {
@@ -126,16 +150,6 @@ export default async function handler(req, res) {
                   type: "plain_text_input",
                   action_id: "baseline_input",
                   initial_value: data.baseline || ""
-                }
-              },
-              {
-                type: "input",
-                block_id: "period_block",
-                label: { type: "plain_text", text: "Period" },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "period_input",
-                  initial_value: data.period || ""
                 }
               },
               {
@@ -241,7 +255,6 @@ export default async function handler(req, res) {
         return res.status(200).json(confirmation);
       }
 
-      // Default confirmation if no modal
       return res.status(200).json(confirmation);
     }
 
