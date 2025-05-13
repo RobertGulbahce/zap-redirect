@@ -35,41 +35,31 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString()
       };
 
-      // Send to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
-      // Post to thread
       if (privateMetadata.channel && privateMetadata.thread_ts) {
         const message = {
           channel: privateMetadata.channel,
           thread_ts: privateMetadata.thread_ts,
-          text: `\uD83D\uDCDD Plan submitted for \"${submitted.title}\"`,
+          text: `📝 Plan submitted for \"${submitted.title}\"`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `📝 *Plan submitted for \"${submitted.title}\"*
-*Focus:* ${submitted.labels}
-*Current Result:* ${submitted.result}
-*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}
-*Period:* ${submitted.period}`
+                text: `📝 *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
               }
             },
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `*Goal:* ${submitted.goal || "–"}
-*Reasoning:* ${submitted.reasoning || "–"}
-*Who else:* ${submitted.involvement || "–"}
-*Next move:* ${submitted.next_move || "–"}
-*Ownership vision:* ${submitted.ownership_vision || "–"}
-*Confidence:* ${submitted.confidence || "–"}`
+                text:
+`*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
               }
             }
           ]
@@ -90,9 +80,13 @@ export default async function handler(req, res) {
 
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
+
+      // Only respond to start_plan button
+      if (action.action_id !== 'start_plan') {
+        return res.status(200).end();
+      }
+
       const data = JSON.parse(action.value || '{}');
-      const userId = payload.user.id;
-      const username = payload.user.username;
       const thread_ts = payload.container?.message_ts;
       const channel = payload.container?.channel_id;
 
@@ -165,34 +159,4 @@ export default async function handler(req, res) {
               block_id: "ownership_block",
               optional: true,
               label: { type: "plain_text", text: "What would ‘10/10 ownership’ of this result look like from you right now?" },
-              element: { type: "plain_text_input", action_id: "ownership_input", multiline: true }
-            },
-            {
-              type: "input",
-              block_id: "confidence_block",
-              optional: true,
-              label: { type: "plain_text", text: "On a scale of 1–10, how confident are you that this result will improve?" },
-              element: { type: "plain_text_input", action_id: "confidence_input" }
-            }
-          ]
-        }
-      };
-
-      await fetch("https://slack.com/api/views.open", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,  
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(modal)
-      });
-
-      return res.status(200).json({ response_action: 'clear' });
-    }
-
-    return res.status(200).end();
-  } catch (err) {
-    console.error("❌ Slack handler error:", err);
-    return res.status(500).json({ error: 'Internal Server Error', detail: err.message });
-  }
-}
+              element: { type: "plain_text_input", action_id: "ownership_input", multiline:
