@@ -101,7 +101,7 @@ export default async function handler(req, res) {
               elements: [
                 {
                   type: "mrkdwn",
-                  text: `:rocket: Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
+                  text: `:rocket: Momentum kicked off by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
                 }
               ]
             }
