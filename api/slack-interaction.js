@@ -37,29 +37,25 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString()
       };
 
-      // Send data to Zapier
+      // Send to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
-      // Post confirmation in thread
+      // Post in thread
       if (submitted.channel && submitted.thread_ts) {
         const threadMessage = {
           channel: submitted.channel,
           thread_ts: submitted.thread_ts,
-          text: `📝 Plan submitted for "${submitted.title}"`,
+          text: `\uD83D\uDCDD Plan submitted for "${submitted.title}"`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `📝 *Plan submitted for "${submitted.title}"*
-*Focus:* ${submitted.labels}
-*Current Result:* ${submitted.result}
-*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}
-*Period:* ${submitted.period}`
+                text: `\uD83D\uDCDD *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
               }
             },
             {
@@ -67,12 +63,7 @@ export default async function handler(req, res) {
               text: {
                 type: "mrkdwn",
                 text:
-`*Goal:* ${submitted.goal || "–"}
-*Reasoning:* ${submitted.reasoning || "–"}
-*Who else:* ${submitted.involvement || "–"}
-*Next move:* ${submitted.next_move || "–"}
-*Ownership vision:* ${submitted.ownership_vision || "–"}
-*Confidence:* ${submitted.confidence || "–"}`
+`*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
               }
             }
           ]
@@ -87,7 +78,7 @@ export default async function handler(req, res) {
           body: JSON.stringify(threadMessage)
         });
 
-        // Update original message to remove button and add confirmation
+        // Replace main message
         const updateMain = {
           channel: submitted.channel,
           ts: submitted.thread_ts,
@@ -236,7 +227,7 @@ export default async function handler(req, res) {
 
     return res.status(200).end();
   } catch (err) {
-    console.error("❌ Slack handler error:", err);
+    console.error("\u274C Slack handler error:", err);
     return res.status(500).json({ error: 'Internal Server Error', detail: err.message });
   }
 }
