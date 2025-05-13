@@ -1,3 +1,5 @@
+// Part 1/2: slack-interaction.js
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
@@ -6,7 +8,6 @@ export default async function handler(req, res) {
   try {
     const payload = req.body.payload ? JSON.parse(req.body.payload) : {};
 
-    // Handle modal submission
     if (payload.type === 'view_submission') {
       const values = payload.view.state.values;
       const privateMetadata = JSON.parse(payload.view.private_metadata || '{}');
@@ -15,19 +16,19 @@ export default async function handler(req, res) {
         values[blockId]?.[actionId]?.value || "";
 
       const submitted = {
-        title: extract("title_block", "title_input"),
-        labels: extract("labels_block", "labels_input"),
-        result: extract("result_block", "result_input"),
-        period: extract("period_block", "period_input"),
-        target: extract("target_block", "target_input"),
-        baseline: extract("baseline_block", "baseline_input"),
-        owner: extract("owner_block", "owner_input"),
         goal: extract("goal_shortterm_block", "goal_shortterm_input"),
         reasoning: extract("reasoning_block", "reasoning_input"),
         involvement: extract("involvement_block", "involvement_input"),
         next_move: extract("next_move_block", "next_move_input"),
         ownership_vision: extract("ownership_block", "ownership_input"),
         confidence: extract("confidence_block", "confidence_input"),
+        title: privateMetadata.title,
+        labels: privateMetadata.labels,
+        result: privateMetadata.results,
+        period: privateMetadata.period,
+        target: privateMetadata.target,
+        baseline: privateMetadata.baseline,
+        owner: privateMetadata.owner,
         from_modal: true,
         slack_user: payload.user.username,
         slack_id: payload.user.id,
@@ -36,57 +37,25 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString()
       };
 
-      // ✅ Send to Zapier as before
+      // Send to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
-      // ✅ Post a formatted thread message
+      // Post to thread
       if (privateMetadata.channel && privateMetadata.thread_ts) {
         const message = {
           channel: privateMetadata.channel,
           thread_ts: privateMetadata.thread_ts,
-          text: `📝 *Plan Submitted for "${submitted.title}"*`,
+          text: `\uD83D\uDCDD Plan submitted for \"${submitted.title}\"`,
           blocks: [
             {
               type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `📝 *Plan Submitted for "${submitted.title}"*\n_Period:_ *${submitted.period}*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target}\n*Baseline:* ${submitted.baseline}`
-              }
-            },
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text:
-`*Goal:* ${submitted.goal || "–"}
-*Why it's here:* ${submitted.reasoning || "–"}
-*Who else is involved:* ${submitted.involvement || "–"}
-*Next move:* ${submitted.next_move || "–"}
-*10/10 Ownership:* ${submitted.ownership_vision || "–"}
-*Confidence:* ${submitted.confidence || "–"}`
-              }
-            }
-          ]
-        };
 
-        await fetch("https://slack.com/api/chat.postMessage", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(message)
-        });
-      }
+              // Part 2/2: continuation of slack-interaction.js (modal with context blocks)
 
-      return res.status(200).json({ response_action: 'clear' });
-    }
-
-    // Handle button click
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
       const data = JSON.parse(action.value || '{}');
@@ -95,228 +64,159 @@ export default async function handler(req, res) {
       const thread_ts = payload.container?.message_ts;
       const channel = payload.container?.channel_id;
 
-      await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: action.action_id,
-          slack_user: username,
-          slack_id: userId,
-          ...data,
-          thread_ts,
-          channel,
-          timestamp: new Date().toISOString()
-        })
+      const private_metadata = JSON.stringify({
+        thread_ts,
+        channel,
+        title: data.title,
+        labels: data.labels,
+        results: data.results,
+        period: data.period,
+        target: data.target,
+        baseline: data.baseline,
+        owner: data.owner
       });
 
-      // Launch modal if applicable
-      if (action.action_id === "start_plan") {
-        const modal = {
-          trigger_id: payload.trigger_id,
-          view: {
-            type: "modal",
-            callback_id: "weekly_plan_modal",
-            private_metadata: JSON.stringify({ thread_ts, channel }),
-            title: { type: "plain_text", text: "Weekly Plan" },
-            submit: { type: "plain_text", text: "Submit" },
-            close: { type: "plain_text", text: "Cancel" },
-            blocks: [
-              {
-                type: "section",
-                block_id: "intro_block",
-                text: {
-                  type: "mrkdwn",
-                  text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
-                }
-              },
-              {
-                type: "input",
-                block_id: "title_block",
-                optional: true,
-                label: { type: "plain_text", text: "Objective Title" },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "title_input",
-                  initial_value: data.title || ""
-                }
-              },
-              {
-                type: "input",
-                block_id: "labels_block",
-                optional: true,
-                label: { type: "plain_text", text: "Focus" },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "labels_input",
-                  initial_value: data.labels || ""
-                }
-              },
-              {
-                type: "input",
-                block_id: "result_block",
-                optional: true,
-                label: { type: "plain_text", text: "Current Result" },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "result_input",
-                  initial_value: data.results || ""
-                }
-              },
-              {
-                type: "input",
-                block_id: "period_block",
-                optional: true,
-                label: { type: "plain_text", text: "Period" },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "period_input",
-                  initial_value: data.period || ""
-                }
-              },
-              {
-                type: "input",
-                block_id: "target_block",
-                optional: true,
-                label: { type: "plain_text", text: "Target" },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "target_input",
-                  initial_value: data.target || ""
-                }
-              },
-              {
-                type: "input",
-                block_id: "baseline_block",
-                optional: true,
-                label: { type: "plain_text", text: "Baseline" },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "baseline_input",
-                  initial_value: data.baseline || ""
-                }
-              },
-              {
-                type: "input",
-                block_id: "owner_block",
-                optional: true,
-                label: { type: "plain_text", text: "Who owns this Objective?" },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "owner_input",
-                  initial_value: data.owner || ""
-                }
-              },
-              {
-                type: "input",
-                block_id: "goal_shortterm_block",
-                optional: true,
-                label: {
-                  type: "plain_text",
-                  text: "What’s your goal for this result in the short term?"
-                },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "goal_shortterm_input"
-                }
-              },
-              {
-                type: "input",
-                block_id: "reasoning_block",
-                optional: true,
-                label: {
-                  type: "plain_text",
-                  text: "What’s your current theory for why this result is where it is?"
-                },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "reasoning_input",
-                  multiline: true
-                }
-              },
-              {
-                type: "input",
-                block_id: "involvement_block",
-                optional: true,
-                label: {
-                  type: "plain_text",
-                  text: "Who else needs to be involved or brought into focus here?"
-                },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "involvement_input",
-                  multiline: true
-                }
-              },
-              {
-                type: "input",
-                block_id: "next_move_block",
-                optional: true,
-                label: {
-                  type: "plain_text",
-                  text: "What’s one move you could make this week to support this result?"
-                },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "next_move_input",
-                  multiline: true
-                }
-              },
-              {
-                type: "input",
-                block_id: "ownership_block",
-                optional: true,
-                label: {
-                  type: "plain_text",
-                  text: "What would ‘10/10 ownership’ of this result look like from you right now?"
-                },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "ownership_input",
-                  multiline: true
-                }
-              },
-              {
-                type: "input",
-                block_id: "confidence_block",
-                optional: true,
-                label: {
-                  type: "plain_text",
-                  text: "On a scale of 1–10, how confident are you that this result will improve?"
-                },
-                element: {
-                  type: "plain_text_input",
-                  action_id: "confidence_input"
-                }
+      const modal = {
+        trigger_id: payload.trigger_id,
+        view: {
+          type: "modal",
+          callback_id: "weekly_plan_modal",
+          private_metadata,
+          title: { type: "plain_text", text: "Weekly Plan" },
+          submit: { type: "plain_text", text: "Submit" },
+          close: { type: "plain_text", text: "Cancel" },
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: "👋 Let’s take a moment to reflect on this result and set your focus for the week ahead."
               }
-            ]
-          }
-        };
-
-        await fetch("https://slack.com/api/views.open", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(modal)
-        });
-
-        return res.status(200).json({ response_action: 'clear' });
-      }
-
-      // fallback
-      return res.status(200).json({
-        response_action: "update",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `✅ *${action.text.text}* triggered by <@${userId}>`
+            },
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: `*Objective Title:* ${data.title}` }]
+            },
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: `*Focus:* ${data.labels}` }]
+            },
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: `*Current Result:* ${data.results}` }]
+            },
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: `*Period:* ${data.period}` }]
+            },
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: `*Target:* ${data.target}` }]
+            },
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: `*Baseline:* ${data.baseline}` }]
+            },
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: `*Who owns this Objective?:* ${data.owner}` }]
+            },
+            {
+              type: "input",
+              block_id: "goal_shortterm_block",
+              optional: true,
+              label: {
+                type: "plain_text",
+                text: "What’s your goal for this result in the short term?"
+              },
+              element: {
+                type: "plain_text_input",
+                action_id: "goal_shortterm_input"
+              }
+            },
+            {
+              type: "input",
+              block_id: "reasoning_block",
+              optional: true,
+              label: {
+                type: "plain_text",
+                text: "What’s your current theory for why this result is where it is?"
+              },
+              element: {
+                type: "plain_text_input",
+                action_id: "reasoning_input",
+                multiline: true
+              }
+            },
+            {
+              type: "input",
+              block_id: "involvement_block",
+              optional: true,
+              label: {
+                type: "plain_text",
+                text: "Who else needs to be involved or brought into focus here?"
+              },
+              element: {
+                type: "plain_text_input",
+                action_id: "involvement_input",
+                multiline: true
+              }
+            },
+            {
+              type: "input",
+              block_id: "next_move_block",
+              optional: true,
+              label: {
+                type: "plain_text",
+                text: "What’s one move you could make this week to support this result?"
+              },
+              element: {
+                type: "plain_text_input",
+                action_id: "next_move_input",
+                multiline: true
+              }
+            },
+            {
+              type: "input",
+              block_id: "ownership_block",
+              optional: true,
+              label: {
+                type: "plain_text",
+                text: "What would ‘10/10 ownership’ of this result look like from you right now?"
+              },
+              element: {
+                type: "plain_text_input",
+                action_id: "ownership_input",
+                multiline: true
+              }
+            },
+            {
+              type: "input",
+              block_id: "confidence_block",
+              optional: true,
+              label: {
+                type: "plain_text",
+                text: "On a scale of 1–10, how confident are you that this result will improve?"
+              },
+              element: {
+                type: "plain_text_input",
+                action_id: "confidence_input"
+              }
             }
-          }
-        ]
+          ]
+        }
+      };
+
+      await fetch("https://slack.com/api/views.open", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(modal)
       });
+
+      return res.status(200).json({ response_action: 'clear' });
     }
 
     return res.status(200).end();
