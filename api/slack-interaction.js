@@ -32,6 +32,7 @@ export default async function handler(req, res) {
         slack_id: payload.user.id,
         thread_ts: privateMetadata.thread_ts || null,
         channel: privateMetadata.channel || null,
+        chart_url: privateMetadata.chart_url || '',
         timestamp: new Date().toISOString()
       };
 
@@ -46,23 +47,31 @@ export default async function handler(req, res) {
           day: '2-digit', month: 'short', year: 'numeric'
         });
 
-        // Post to thread with confirmation message
-        const message = {
-          channel: privateMetadata.channel,
-          thread_ts: privateMetadata.thread_ts,
-          text: `🚀 Challenge accepted by <@${submitted.slack_id}> on ${dateStr}`,
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `🚀 *Challenge accepted by <@${submitted.slack_id}> on ${dateStr}*`
-              }
+        // Update original message with confirmation at the bottom and remove buttons
+        const updatedBlocks = [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `Here's today’s *${submitted.title}* report:`
             }
-          ]
-        };
+          },
+          {
+            type: "image",
+            image_url: submitted.chart_url,
+            alt_text: `${submitted.title} chart`
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `🚀 Challenge accepted by <@${submitted.slack_id}> on ${dateStr}`
+              }
+            ]
+          }
+        ];
 
-        // Remove button from original message
         await fetch("https://slack.com/api/chat.update", {
           method: "POST",
           headers: {
@@ -72,31 +81,9 @@ export default async function handler(req, res) {
           body: JSON.stringify({
             channel: privateMetadata.channel,
             ts: privateMetadata.thread_ts,
-            text: `Here's today's ${submitted.title} report:`,
-            blocks: [
-              {
-                type: "section",
-                text: {
-                  type: "mrkdwn",
-                  text: `Here's today’s *${submitted.title}* report:`
-                }
-              },
-              {
-                type: "image",
-                image_url: privateMetadata.chart_url || '',
-                alt_text: `${submitted.title} chart`
-              }
-            ]
+            text: `Here's today’s ${submitted.title} report`,
+            blocks: updatedBlocks
           })
-        });
-
-        await fetch("https://slack.com/api/chat.postMessage", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(message)
         });
       }
 
