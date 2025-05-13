@@ -9,6 +9,8 @@ export default async function handler(req, res) {
     // Handle modal submission
     if (payload.type === 'view_submission') {
       const values = payload.view.state.values;
+      const privateMetadata = JSON.parse(payload.view.private_metadata || '{}');
+
       const extract = (blockId, actionId) =>
         values[blockId]?.[actionId]?.value || "";
 
@@ -29,14 +31,57 @@ export default async function handler(req, res) {
         from_modal: true,
         slack_user: payload.user.username,
         slack_id: payload.user.id,
+        thread_ts: privateMetadata.thread_ts || null,
+        channel: privateMetadata.channel || null,
         timestamp: new Date().toISOString()
       };
 
+      // ✅ Send to Zapier as before
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
+
+      // ✅ Post a formatted thread message
+      if (privateMetadata.channel && privateMetadata.thread_ts) {
+        const message = {
+          channel: privateMetadata.channel,
+          thread_ts: privateMetadata.thread_ts,
+          text: `📝 *Plan Submitted for "${submitted.title}"*`,
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `📝 *Plan Submitted for "${submitted.title}"*\n_Period:_ *${submitted.period}*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target}\n*Baseline:* ${submitted.baseline}`
+              }
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text:
+`*Goal:* ${submitted.goal || "–"}
+*Why it's here:* ${submitted.reasoning || "–"}
+*Who else is involved:* ${submitted.involvement || "–"}
+*Next move:* ${submitted.next_move || "–"}
+*10/10 Ownership:* ${submitted.ownership_vision || "–"}
+*Confidence:* ${submitted.confidence || "–"}`
+              }
+            }
+          ]
+        };
+
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(message)
+        });
+      }
 
       return res.status(200).json({ response_action: 'clear' });
     }
@@ -44,42 +89,34 @@ export default async function handler(req, res) {
     // Handle button click
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
-      const actionId = action.action_id;
       const data = JSON.parse(action.value || '{}');
       const userId = payload.user.id;
       const username = payload.user.username;
+      const thread_ts = payload.container?.message_ts;
+      const channel = payload.container?.channel_id;
 
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: actionId,
+          action: action.action_id,
           slack_user: username,
           slack_id: userId,
           ...data,
+          thread_ts,
+          channel,
           timestamp: new Date().toISOString()
         })
       });
 
-      const confirmation = {
-        response_action: "update",
-        blocks: [
-          {
-            type: "section",
-            text: {
-              type: "mrkdwn",
-              text: `✅ *${action.text.text}* triggered by <@${userId}> for *${data.owner}*`
-            }
-          }
-        ]
-      };
-
-      if (actionId === "start_plan") {
+      // Launch modal if applicable
+      if (action.action_id === "start_plan") {
         const modal = {
           trigger_id: payload.trigger_id,
           view: {
             type: "modal",
             callback_id: "weekly_plan_modal",
+            private_metadata: JSON.stringify({ thread_ts, channel }),
             title: { type: "plain_text", text: "Weekly Plan" },
             submit: { type: "plain_text", text: "Submit" },
             close: { type: "plain_text", text: "Cancel" },
@@ -95,6 +132,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "title_block",
+                optional: true,
                 label: { type: "plain_text", text: "Objective Title" },
                 element: {
                   type: "plain_text_input",
@@ -105,6 +143,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "labels_block",
+                optional: true,
                 label: { type: "plain_text", text: "Focus" },
                 element: {
                   type: "plain_text_input",
@@ -115,6 +154,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "result_block",
+                optional: true,
                 label: { type: "plain_text", text: "Current Result" },
                 element: {
                   type: "plain_text_input",
@@ -125,6 +165,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "period_block",
+                optional: true,
                 label: { type: "plain_text", text: "Period" },
                 element: {
                   type: "plain_text_input",
@@ -135,6 +176,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "target_block",
+                optional: true,
                 label: { type: "plain_text", text: "Target" },
                 element: {
                   type: "plain_text_input",
@@ -145,6 +187,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "baseline_block",
+                optional: true,
                 label: { type: "plain_text", text: "Baseline" },
                 element: {
                   type: "plain_text_input",
@@ -155,6 +198,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "owner_block",
+                optional: true,
                 label: { type: "plain_text", text: "Who owns this Objective?" },
                 element: {
                   type: "plain_text_input",
@@ -165,19 +209,20 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "goal_shortterm_block",
+                optional: true,
                 label: {
                   type: "plain_text",
                   text: "What’s your goal for this result in the short term?"
                 },
                 element: {
                   type: "plain_text_input",
-                  action_id: "goal_shortterm_input",
-                  multiline: true
+                  action_id: "goal_shortterm_input"
                 }
               },
               {
                 type: "input",
                 block_id: "reasoning_block",
+                optional: true,
                 label: {
                   type: "plain_text",
                   text: "What’s your current theory for why this result is where it is?"
@@ -191,6 +236,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "involvement_block",
+                optional: true,
                 label: {
                   type: "plain_text",
                   text: "Who else needs to be involved or brought into focus here?"
@@ -204,6 +250,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "next_move_block",
+                optional: true,
                 label: {
                   type: "plain_text",
                   text: "What’s one move you could make this week to support this result?"
@@ -217,6 +264,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "ownership_block",
+                optional: true,
                 label: {
                   type: "plain_text",
                   text: "What would ‘10/10 ownership’ of this result look like from you right now?"
@@ -230,6 +278,7 @@ export default async function handler(req, res) {
               {
                 type: "input",
                 block_id: "confidence_block",
+                optional: true,
                 label: {
                   type: "plain_text",
                   text: "On a scale of 1–10, how confident are you that this result will improve?"
@@ -252,10 +301,22 @@ export default async function handler(req, res) {
           body: JSON.stringify(modal)
         });
 
-        return res.status(200).json(confirmation);
+        return res.status(200).json({ response_action: 'clear' });
       }
 
-      return res.status(200).json(confirmation);
+      // fallback
+      return res.status(200).json({
+        response_action: "update",
+        blocks: [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `✅ *${action.text.text}* triggered by <@${userId}>`
+            }
+          }
+        ]
+      });
     }
 
     return res.status(200).end();
