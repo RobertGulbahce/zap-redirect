@@ -35,51 +35,43 @@ export default async function handler(req, res) {
         timestamp: new Date().toISOString()
       };
 
-      // Send to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
-      // Update original Slack message
       if (privateMetadata.channel && privateMetadata.thread_ts) {
-        await fetch("https://slack.com/api/chat.update", {
+        const message = {
+          channel: privateMetadata.channel,
+          thread_ts: privateMetadata.thread_ts,
+          text: `📝 Plan submitted for \"${submitted.title}\"`,
+          blocks: [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `📝 *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
+              }
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text:
+`*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
+              }
+            }
+          ]
+        };
+
+        await fetch("https://slack.com/api/chat.postMessage", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({
-            channel: privateMetadata.channel,
-            ts: privateMetadata.thread_ts,
-            text: `Here's today's ${submitted.title} report:`,
-            blocks: [
-              {
-                type: "section",
-                text: {
-                  type: "mrkdwn",
-                  text: `Here's today's *${submitted.title}* report:`
-                }
-              },
-              {
-                type: "image",
-                image_url:
-                  submitted.image_url ||
-                  "https://via.placeholder.com/600x300?text=Chart",
-                alt_text: `${submitted.title} chart`
-              },
-              {
-                type: "context",
-                elements: [
-                  {
-                    type: "mrkdwn",
-                    text: `🚀 *Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}*`
-                  }
-                ]
-              }
-            ]
-          })
+          body: JSON.stringify(message)
         });
       }
 
@@ -88,6 +80,8 @@ export default async function handler(req, res) {
 
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
+
+      // Only respond to start_plan button
       if (action.action_id !== 'start_plan') {
         return res.status(200).end();
       }
@@ -136,83 +130,43 @@ export default async function handler(req, res) {
               type: "input",
               block_id: "goal_shortterm_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "What’s your goal for this result in the short term?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "goal_shortterm_input"
-              }
+              label: { type: "plain_text", text: "What’s your goal for this result in the short term?" },
+              element: { type: "plain_text_input", action_id: "goal_shortterm_input" }
             },
             {
               type: "input",
               block_id: "reasoning_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "What’s your current theory for why this result is where it is?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "reasoning_input",
-                multiline: true
-              }
+              label: { type: "plain_text", text: "What’s your current theory for why this result is where it is?" },
+              element: { type: "plain_text_input", action_id: "reasoning_input", multiline: true }
             },
             {
               type: "input",
               block_id: "involvement_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "Who else needs to be involved or brought into focus here?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "involvement_input",
-                multiline: true
-              }
+              label: { type: "plain_text", text: "Who else needs to be involved or brought into focus here?" },
+              element: { type: "plain_text_input", action_id: "involvement_input", multiline: true }
             },
             {
               type: "input",
               block_id: "next_move_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "What’s one move you could make this week to support this result?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "next_move_input",
-                multiline: true
-              }
+              label: { type: "plain_text", text: "What’s one move you could make this week to support this result?" },
+              element: { type: "plain_text_input", action_id: "next_move_input", multiline: true }
             },
             {
               type: "input",
               block_id: "ownership_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "What would ‘10/10 ownership’ of this result look like from you right now?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "ownership_input",
-                multiline: true
-              }
+              label: { type: "plain_text", text: "What would ‘10/10 ownership’ of this result look like from you right now?" },
+              element: { type: "plain_text_input", action_id: "ownership_input", multiline: true }
             },
             {
               type: "input",
               block_id: "confidence_block",
               optional: true,
-              label: {
-                type: "plain_text",
-                text: "On a scale of 1–10, how confident are you that this result will improve?"
-              },
-              element: {
-                type: "plain_text_input",
-                action_id: "confidence_input"
-              }
+              label: { type: "plain_text", text: "On a scale of 1–10, how confident are you that this result will improve?" },
+              element: { type: "plain_text_input", action_id: "confidence_input" }
             }
           ]
         }
