@@ -215,7 +215,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify(modal)
       });
-
+ }
       return res.status(200).json({ response_action: 'clear' });
     }
 
