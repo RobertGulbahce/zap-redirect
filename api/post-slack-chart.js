@@ -6,7 +6,8 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    const payload = {
+    // Step 1: Send initial message without full value
+    const initialPayload = {
       channel: "C08QXCVUH6Y",
       text: `Here's today's ${data.title} report:`,
       blocks: [
@@ -30,21 +31,10 @@ export default async function handler(req, res) {
               action_id: "start_plan",
               text: {
                 type: "plain_text",
-                text: "📝 Plan My Actions",
+                text: "🗘️ Plan My Actions",
                 emoji: true
               },
-              value: JSON.stringify({
-                owner: data.owner,
-                user: data.user,
-                row: data.row,
-                labels: data.labels,
-                results: data.results,
-                target: data.target,
-                baseline: data.baseline,
-                title: data.title,
-                period: data.period,
-                timestamp: data.timestamp
-              })
+              value: "placeholder"
             }
           ]
         }
@@ -57,7 +47,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(initialPayload)
     });
 
     const slackData = await slackRes.json();
@@ -66,11 +56,46 @@ export default async function handler(req, res) {
       throw new Error(`Slack API error: ${slackData.error}`);
     }
 
+    // Step 2: Create final value with channel + ts
+    const fullValue = JSON.stringify({
+      channel: slackData.channel,
+      ts: slackData.ts,
+      owner: data.owner,
+      user: data.user,
+      row: data.row,
+      labels: data.labels,
+      results: data.results,
+      target: data.target,
+      baseline: data.baseline,
+      title: data.title,
+      period: data.period,
+      timestamp: data.timestamp,
+      chart_url: data.chart_url
+    });
+
+    // Step 3: Update original message with final value in button
+    const finalBlocks = initialPayload.blocks;
+    finalBlocks[2].elements[0].value = fullValue;
+
+    await fetch("https://slack.com/api/chat.update", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        channel: slackData.channel,
+        ts: slackData.ts,
+        blocks: finalBlocks,
+        text: initialPayload.text
+      })
+    });
+
     return res.status(200).json({
       ok: true,
       channel: slackData.channel,
       ts: slackData.ts,
-      message: "Chart sent to Slack."
+      message: "Chart sent and button updated."
     });
   } catch (err) {
     console.error("Error posting to Slack:", err);
