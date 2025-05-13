@@ -33,26 +33,33 @@ export default async function handler(req, res) {
         slack_id: payload.user.id,
         thread_ts: privateMetadata.thread_ts || null,
         channel: privateMetadata.channel || null,
+        chart_url: privateMetadata.chart_url || null,
         timestamp: new Date().toISOString()
       };
 
+      // Send data to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
+      // Post confirmation in thread
       if (submitted.channel && submitted.thread_ts) {
         const threadMessage = {
           channel: submitted.channel,
           thread_ts: submitted.thread_ts,
-          text: `📝 Plan submitted for \"${submitted.title}\"`,
+          text: `📝 Plan submitted for "${submitted.title}"`,
           blocks: [
             {
               type: "section",
               text: {
                 type: "mrkdwn",
-                text: `📝 *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
+                text: `📝 *Plan submitted for "${submitted.title}"*
+*Focus:* ${submitted.labels}
+*Current Result:* ${submitted.result}
+*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}
+*Period:* ${submitted.period}`
               }
             },
             {
@@ -60,7 +67,12 @@ export default async function handler(req, res) {
               text: {
                 type: "mrkdwn",
                 text:
-`*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
+`*Goal:* ${submitted.goal || "–"}
+*Reasoning:* ${submitted.reasoning || "–"}
+*Who else:* ${submitted.involvement || "–"}
+*Next move:* ${submitted.next_move || "–"}
+*Ownership vision:* ${submitted.ownership_vision || "–"}
+*Confidence:* ${submitted.confidence || "–"}`
               }
             }
           ]
@@ -75,7 +87,7 @@ export default async function handler(req, res) {
           body: JSON.stringify(threadMessage)
         });
 
-        // Update chart message
+        // Update original message to remove button and add confirmation
         const updateMain = {
           channel: submitted.channel,
           ts: submitted.thread_ts,
@@ -90,7 +102,7 @@ export default async function handler(req, res) {
             },
             {
               type: "image",
-              image_url: privateMetadata.chart_url || "https://via.placeholder.com/600x300?text=Chart",
+              image_url: submitted.chart_url || "https://via.placeholder.com/600x300?text=Chart",
               alt_text: `${submitted.title} chart`
             },
             {
@@ -98,7 +110,7 @@ export default async function handler(req, res) {
               elements: [
                 {
                   type: "mrkdwn",
-                  text: `:rocket: Challenge accepted by <@${submitted.slack_id}> on *${new Date().toLocaleDateString("en-AU")}*`
+                  text: `:rocket: Challenge accepted by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
                 }
               ]
             }
@@ -118,6 +130,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ response_action: 'clear' });
     }
 
+    // Handle button click
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
       if (action.action_id !== 'start_plan') return res.status(200).end();
