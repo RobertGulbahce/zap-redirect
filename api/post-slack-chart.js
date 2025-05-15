@@ -6,22 +6,15 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // Determine status emoji based on performance
-    const statusEmoji =
-      data.performanceStatus === "On-Target" ? "🟩" :
-      data.performanceStatus === "Baseline" ? "🟧" :
-      "🟥";
-
-    // Step 1: Send initial message without full value
     const initialPayload = {
       channel: "C08QXCVUH6Y",
-      text: `${statusEmoji} Here's today’s ${data.title} report:`,
+      text: `Here's today's ${data.title} report:`,
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `${statusEmoji} Here's today’s *${data.title}* report:`
+            text: `Here's today's *${data.title}* report:`
           }
         },
         {
@@ -41,6 +34,16 @@ export default async function handler(req, res) {
                 emoji: true
               },
               value: "placeholder"
+            },
+            {
+              type: "button",
+              action_id: "download_chart",
+              text: {
+                type: "plain_text",
+                text: "📥 Download",
+                emoji: true
+              },
+              url: data.chart_url
             }
           ]
         }
@@ -62,7 +65,6 @@ export default async function handler(req, res) {
       throw new Error(`Slack API error: ${slackData.error}`);
     }
 
-    // Step 2: Create full value for callback
     const fullValue = JSON.stringify({
       channel: slackData.channel,
       ts: slackData.ts,
@@ -76,13 +78,11 @@ export default async function handler(req, res) {
       title: data.title,
       period: data.period,
       timestamp: data.timestamp,
-      chart_url: data.chart_url,
-      performanceStatus: data.performanceStatus
+      chart_url: data.chart_url
     });
 
-    // Step 3: Update original message with real button value
-    const finalBlocks = initialPayload.blocks;
-    finalBlocks[2].elements[0].value = fullValue;
+    const updatedBlocks = initialPayload.blocks;
+    updatedBlocks[2].elements[0].value = fullValue;
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         channel: slackData.channel,
         ts: slackData.ts,
-        blocks: finalBlocks,
+        blocks: updatedBlocks,
         text: initialPayload.text
       })
     });
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       ok: true,
       channel: slackData.channel,
       ts: slackData.ts,
-      message: "Chart sent and button updated."
+      message: "Chart sent and updated."
     });
   } catch (err) {
     console.error("Error posting to Slack:", err);
