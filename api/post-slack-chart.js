@@ -6,16 +6,22 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
+    // Determine status emoji based on performance
+    const statusEmoji =
+      data.performanceStatus === "On-Target" ? "🟩" :
+      data.performanceStatus === "Baseline" ? "🟧" :
+      "🟥";
+
     // Step 1: Send initial message without full value
     const initialPayload = {
       channel: "C08QXCVUH6Y",
-      text: `Here's today's ${data.title} report:`,
+      text: `${statusEmoji} Here's today’s ${data.title} report:`,
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `Here's today's *${data.title}* report:`
+            text: `${statusEmoji} Here's today’s *${data.title}* report:`
           }
         },
         {
@@ -56,7 +62,7 @@ export default async function handler(req, res) {
       throw new Error(`Slack API error: ${slackData.error}`);
     }
 
-    // Step 2: Create final value with channel + ts
+    // Step 2: Create full value for callback
     const fullValue = JSON.stringify({
       channel: slackData.channel,
       ts: slackData.ts,
@@ -70,10 +76,11 @@ export default async function handler(req, res) {
       title: data.title,
       period: data.period,
       timestamp: data.timestamp,
-      chart_url: data.chart_url
+      chart_url: data.chart_url,
+      performanceStatus: data.performanceStatus
     });
 
-    // Step 3: Update original message with final value in button
+    // Step 3: Update original message with real button value
     const finalBlocks = initialPayload.blocks;
     finalBlocks[2].elements[0].value = fullValue;
 
