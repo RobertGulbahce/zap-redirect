@@ -41,6 +41,34 @@ export default async function handler(req, res) {
         },
         {
           type: "actions",
+          block_id: "send_to_user_block",
+          elements: [
+            {
+              type: "users_select",
+              action_id: "selected_user",
+              placeholder: {
+                type: "plain_text",
+                text: "Select a user"
+              }
+            },
+            {
+              type: "button",
+              action_id: "send_to_selected_user",
+              text: {
+                type: "plain_text",
+                text: "📤 Send to Selected User"
+              },
+              style: "primary",
+              value: JSON.stringify({
+                chart_url: data.chart_url,
+                title: data.title,
+                period: data.period
+              })
+            }
+          ]
+        },
+        {
+          type: "actions",
           elements: [
             {
               type: "button",
@@ -99,7 +127,7 @@ export default async function handler(req, res) {
     });
 
     const updatedBlocks = initialPayload.blocks;
-    updatedBlocks[3].elements[0].value = fullValue; // Start Plan button
+    updatedBlocks[4].elements[0].value = fullValue; // Plan My Actions button
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
@@ -119,7 +147,7 @@ export default async function handler(req, res) {
       ok: true,
       channel: slackData.channel,
       ts: slackData.ts,
-      message: "Chart sent and updated."
+      message: "Chart sent and updated with dropdown and buttons."
     });
   } catch (err) {
     console.error("Error posting to Slack:", err);
