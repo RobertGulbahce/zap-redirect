@@ -15,28 +15,28 @@ export default async function handler(req, res) {
         values[blockId]?.[actionId]?.value || "";
 
       const submitted = {
-        goal: extract("goal_shortterm_block", "goal_shortterm_input"),
-        reasoning: extract("reasoning_block", "reasoning_input"),
-        involvement: extract("involvement_block", "involvement_input"),
-        next_move: extract("next_move_block", "next_move_input"),
-        ownership_vision: extract("ownership_block", "ownership_input"),
-        confidence: extract("confidence_block", "confidence_input"),
-        title: privateMetadata.title,
-        labels: privateMetadata.labels,
-        result: privateMetadata.results,
-        period: privateMetadata.period,
-        target: privateMetadata.target,
-        baseline: privateMetadata.baseline,
-        owner: privateMetadata.owner,
-        from_modal: true,
-        slack_user: payload.user.username,
-        slack_id: payload.user.id,
-        thread_ts: privateMetadata.thread_ts || null,
-        channel: privateMetadata.channel || null,
-        chart_url: privateMetadata.chart_url || null,
-        timestamp: new Date().toISOString()
-      };
-
+  goal: extract("goal_shortterm_block", "goal_shortterm_input"),
+  reasoning: extract("reasoning_block", "reasoning_input"),
+  involvement: extract("involvement_block", "involvement_input"),
+  next_move: extract("next_move_block", "next_move_input"),
+  ownership_vision: extract("ownership_block", "ownership_input"),
+  confidence: extract("confidence_block", "confidence_input"),
+  title: privateMetadata.title,
+  labels: privateMetadata.labels,
+  result: privateMetadata.results,
+  period: privateMetadata.period,
+  target: privateMetadata.target,
+  baseline: privateMetadata.baseline,
+  owner: privateMetadata.owner,
+  performanceStatus: privateMetadata.performanceStatus,  // ✅ new line
+  from_modal: true,
+  slack_user: payload.user.username,
+  slack_id: payload.user.id,
+  thread_ts: privateMetadata.thread_ts || null,
+  channel: privateMetadata.channel || null,
+  chart_url: privateMetadata.chart_url || null,
+  timestamp: new Date().toISOString()
+};
       // Send to Zapier
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
