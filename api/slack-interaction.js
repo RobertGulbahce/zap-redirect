@@ -15,98 +15,65 @@ export default async function handler(req, res) {
         values[blockId]?.[actionId]?.value || "";
 
       const submitted = {
-  goal: extract("goal_shortterm_block", "goal_shortterm_input"),
-  reasoning: extract("reasoning_block", "reasoning_input"),
-  involvement: extract("involvement_block", "involvement_input"),
-  next_move: extract("next_move_block", "next_move_input"),
-  ownership_vision: extract("ownership_block", "ownership_input"),
-  confidence: extract("confidence_block", "confidence_input"),
-  title: privateMetadata.title,
-  labels: privateMetadata.labels,
-  result: privateMetadata.results,
-  period: privateMetadata.period,
-  target: privateMetadata.target,
-  baseline: privateMetadata.baseline,
-  owner: privateMetadata.owner,
-  performanceStatus: privateMetadata.performanceStatus,
-  from_modal: true,
-  slack_user: payload.user.username,
-  slack_id: payload.user.id,
-  thread_ts: privateMetadata.thread_ts || null,
-  channel: privateMetadata.channel || null,
-  chart_url: privateMetadata.chart_url || null,
-  timestamp: new Date().toISOString()
-};
-      // Send to Zapier
+        goal: extract("goal_shortterm_block", "goal_shortterm_input"),
+        reasoning: extract("reasoning_block", "reasoning_input"),
+        involvement: extract("involvement_block", "involvement_input"),
+        next_move: extract("next_move_block", "next_move_input"),
+        ownership_vision: extract("ownership_block", "ownership_input"),
+        confidence: extract("confidence_block", "confidence_input"),
+        title: privateMetadata.title,
+        labels: privateMetadata.labels,
+        result: privateMetadata.results,
+        period: privateMetadata.period,
+        target: privateMetadata.target,
+        baseline: privateMetadata.baseline,
+        owner: privateMetadata.owner,
+        performanceStatus: privateMetadata.performanceStatus,
+        from_modal: true,
+        slack_user: payload.user.username,
+        slack_id: payload.user.id,
+        thread_ts: privateMetadata.thread_ts || null,
+        channel: privateMetadata.channel || null,
+        chart_url: privateMetadata.chart_url || null,
+        timestamp: new Date().toISOString()
+      };
+
       await fetch("https://hooks.zapier.com/hooks/catch/395556/2np7erm/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitted)
       });
 
-      // Post in thread
       if (submitted.channel && submitted.thread_ts) {
-        const threadMessage = {
-          channel: submitted.channel,
-          thread_ts: submitted.thread_ts,
-          text: `\uD83D\uDCDD Plan submitted for "${submitted.title}"`,
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `\uD83D\uDCDD *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
-              }
-            },
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text:
-`*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
-              }
-            }
-          ]
-        };
-
         await fetch("https://slack.com/api/chat.postMessage", {
           method: "POST",
           headers: {
             Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify(threadMessage)
-        });
-
-        // Replace main message
-        const updateMain = {
-          channel: submitted.channel,
-          ts: submitted.thread_ts,
-          text: `Here's today's ${submitted.title} report:`,
-          blocks: [
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `Here's today's *${submitted.title}* report:`
-              }
-            },
-            {
-              type: "image",
-              image_url: submitted.chart_url || "https://via.placeholder.com/600x300?text=Chart",
-              alt_text: `${submitted.title} chart`
-            },
-            {
-              type: "context",
-              elements: [
-                {
+          body: JSON.stringify({
+            channel: submitted.channel,
+            thread_ts: submitted.thread_ts,
+            text: `\uD83D\uDCDD Plan submitted for \"${submitted.title}\"`,
+            blocks: [
+              {
+                type: "section",
+                text: {
                   type: "mrkdwn",
-                  text: `:rocket: Momentum kicked off by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
+                  text: `\uD83D\uDCDD *Plan submitted for \"${submitted.title}\"*\n*Focus:* ${submitted.labels}\n*Current Result:* ${submitted.result}\n*Target:* ${submitted.target} | *Baseline:* ${submitted.baseline}\n*Period:* ${submitted.period}`
                 }
-              ]
-            }
-          ]
-        };
+              },
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text:
+                    `*Goal:* ${submitted.goal || "–"}\n*Reasoning:* ${submitted.reasoning || "–"}\n*Who else:* ${submitted.involvement || "–"}\n*Next move:* ${submitted.next_move || "–"}\n*Ownership vision:* ${submitted.ownership_vision || "–"}\n*Confidence:* ${submitted.confidence || "–"}`
+                }
+              }
+            ]
+          })
+        });
 
         await fetch("https://slack.com/api/chat.update", {
           method: "POST",
@@ -114,16 +81,76 @@ export default async function handler(req, res) {
             Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
             "Content-Type": "application/json"
           },
-          body: JSON.stringify(updateMain)
+          body: JSON.stringify({
+            channel: submitted.channel,
+            ts: submitted.thread_ts,
+            text: `Here's today's ${submitted.title} report:`,
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `Here's today's *${submitted.title}* report:`
+                }
+              },
+              {
+                type: "image",
+                image_url: submitted.chart_url || "https://via.placeholder.com/600x300?text=Chart",
+                alt_text: `${submitted.title} chart`
+              },
+              {
+                type: "context",
+                elements: [
+                  {
+                    type: "mrkdwn",
+                    text: `:rocket: Momentum kicked off by <@${submitted.slack_id}> on ${new Date().toLocaleDateString("en-AU")}`
+                  }
+                ]
+              }
+            ]
+          })
         });
       }
 
       return res.status(200).json({ response_action: 'clear' });
     }
 
-    // Handle button click
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
+
+      if (action.action_id === "send_to_selected_user") {
+        const selectedUserId = payload.state.values.send_to_user_block.selected_user.selected_user;
+        const valueData = JSON.parse(action.value);
+
+        await fetch("https://slack.com/api/chat.postMessage", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            channel: selectedUserId,
+            text: `📊 Report: ${valueData.title}`,
+            blocks: [
+              {
+                type: "section",
+                text: {
+                  type: "mrkdwn",
+                  text: `📊 *${valueData.title}*\n_Period: ${valueData.period}_`
+                }
+              },
+              {
+                type: "image",
+                image_url: valueData.chart_url,
+                alt_text: valueData.title
+              }
+            ]
+          })
+        });
+
+        return res.status(200).send();
+      }
+
       if (action.action_id !== 'start_plan') return res.status(200).end();
 
       const data = JSON.parse(action.value || '{}');
@@ -140,7 +167,8 @@ export default async function handler(req, res) {
         target: data.target,
         baseline: data.baseline,
         owner: data.owner,
-        chart_url: data.chart_url || ""
+        chart_url: data.chart_url || "",
+        performanceStatus: data.performanceStatus || ""
       });
 
       const modal = {
