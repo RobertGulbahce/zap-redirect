@@ -28,7 +28,7 @@ export default async function handler(req, res) {
   target: privateMetadata.target,
   baseline: privateMetadata.baseline,
   owner: privateMetadata.owner,
-  performanceStatus: privateMetadata.performanceStatus,  // ✅ new line
+  performanceStatus: privateMetadata.performanceStatus,
   from_modal: true,
   slack_user: payload.user.username,
   slack_id: payload.user.id,
