@@ -23,6 +23,23 @@ export default async function handler(req, res) {
           alt_text: `${data.title} chart`
         },
         {
+          type: "section",
+          block_id: "assign_user_block",
+          text: {
+            type: "mrkdwn",
+            text: "*Select a performance owner:*"
+          },
+          accessory: {
+            type: "users_select",
+            action_id: "select_performance_owner",
+            placeholder: {
+              type: "plain_text",
+              text: "Choose a user",
+              emoji: true
+            }
+          }
+        },
+        {
           type: "actions",
           elements: [
             {
@@ -40,7 +57,7 @@ export default async function handler(req, res) {
               action_id: "download_chart",
               text: {
                 type: "plain_text",
-                text: "📥 Download",
+                text: "📅 Download",
                 emoji: true
               },
               url: data.chart_url
@@ -82,7 +99,7 @@ export default async function handler(req, res) {
     });
 
     const updatedBlocks = initialPayload.blocks;
-    updatedBlocks[2].elements[0].value = fullValue;
+    updatedBlocks[3].elements[0].value = fullValue; // Start Plan button
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
