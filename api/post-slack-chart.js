@@ -32,30 +32,30 @@ export default async function handler(req, res) {
   }
 
   // Helper: Build summary message
-  function buildNarrative(status, actual, target, baseline, metric, location, metricType) {
+  function buildNarrative(status, actual, target, baseline, metricName, location, metricType) {
     const actualFormatted = formatValue(actual, metricType);
     const targetFormatted = formatValue(target, metricType);
     const baselineFormatted = formatValue(baseline, metricType);
 
     const templates = {
       Ahead: `✅ ${location} is ahead of target  
-${metric} reached ${actualFormatted}, outperforming the ${targetFormatted} target and the ${baselineFormatted} baseline.  
+${metricName} reached ${actualFormatted}, outperforming the ${targetFormatted} target and the ${baselineFormatted} baseline.  
 Now’s the time to build on this momentum.`,
 
       OnTrack: `⚖️ ${location} is on track  
-${metric} came in at ${actualFormatted}, right around the ${targetFormatted} goal and comfortably above the ${baselineFormatted}.  
+${metricName} came in at ${actualFormatted}, right around the ${targetFormatted} goal and comfortably above the ${baselineFormatted}.  
 Steady performance — let’s keep it up.`,
 
       SlightlyBehind: `⚠️ ${location} is slightly behind target  
-${metric} reached ${actualFormatted}, just under the ${targetFormatted} but still ahead of the ${baselineFormatted}.  
+${metricName} reached ${actualFormatted}, just under the ${targetFormatted} but still ahead of the ${baselineFormatted}.  
 A small nudge could make the difference.`,
 
       FallingBehind: `🔻 ${location} is underperforming  
-${metric} was ${actualFormatted}, below the target of ${targetFormatted} and trailing the ${baselineFormatted}.  
+${metricName} was ${actualFormatted}, below the target of ${targetFormatted} and trailing the ${baselineFormatted}.  
 Let’s rally support and take action early.`,
 
       OffTrack: `🔴 ${location} is off track  
-${metric} fell to ${actualFormatted}, well below the ${targetFormatted} and the ${baselineFormatted}.  
+${metricName} fell to ${actualFormatted}, well below the ${targetFormatted} and the ${baselineFormatted}.  
 This is a critical moment to step in and redirect.`
     };
 
@@ -71,7 +71,7 @@ This is a critical moment to step in and redirect.`
     const baseline = Number(data.baseline);
 
     // Descriptive and contextual inputs
-    const metric = data.title;
+    const metricName = data.title;
     const location = data.labels;
     const period = data.period;
     const user = data.user;
@@ -80,8 +80,8 @@ This is a critical moment to step in and redirect.`
     const timestamp = data.timestamp;
     const chartUrl = data.chart_url;
 
-    // Extended fields
-    const metricType = data.metric_type || "count"; // percentage | dollar | count
+    // Use correct key: "metric" for metric type
+    const metricType = data.metric || "count"; // "percentage" | "dollar" | "count"
     const type = data.type || "";
     const targetFormatted = data.targetFormatted || "";
     const baselineFormatted = data.baselineFormatted || "";
@@ -94,7 +94,7 @@ This is a critical moment to step in and redirect.`
       actual,
       target,
       baseline,
-      metric,
+      metricName,
       location,
       metricType
     );
@@ -103,7 +103,7 @@ This is a critical moment to step in and redirect.`
     const initialPayload = {
       channel: "C08QXCVUH6Y",
       text:
-        `*${metric}* report  \n` +
+        `*${metricName}* report  \n` +
         `*Date:* ${period}  \n` +
         `*Location:* ${location}  \n` +
         `*Requested by:* ${user}\n\n` +
@@ -128,7 +128,7 @@ This is a critical moment to step in and redirect.`
         {
           type: "image",
           image_url: chartUrl,
-          alt_text: `${metric} chart`
+          alt_text: `${metricName} chart`
         },
         {
           type: "section",
@@ -201,11 +201,11 @@ This is a critical moment to step in and redirect.`
       results: actual,
       target,
       baseline,
-      title: metric,
+      title: metricName,
       period,
       timestamp,
       chart_url: chartUrl,
-      metric_type: metricType,
+      metric: metricType, // ← this is your type value now
       type,
       targetFormatted,
       baselineFormatted,
