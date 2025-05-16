@@ -6,6 +6,7 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
+    // Step 1: Send initial message without full value
     const initialPayload = {
       channel: "C08QXCVUH6Y",
       text: `Here's today's ${data.title} report:`,
@@ -24,33 +25,6 @@ export default async function handler(req, res) {
         },
         {
           type: "actions",
-          block_id: "send_to_user_block",
-          elements: [
-            {
-              type: "users_select",
-              action_id: "selected_user",
-              placeholder: {
-                type: "plain_text",
-                text: "Select a user"
-              }
-            },
-            {
-              type: "button",
-              action_id: "send_to_selected_user",
-              text: {
-                type: "plain_text",
-                text: "📤 Send to Selected User"
-              },
-              style: "primary",
-              value: JSON.stringify({
-                chart_url: data.chart_url,
-                title: data.title
-              })
-            }
-          ]
-        },
-        {
-          type: "actions",
           elements: [
             {
               type: "button",
@@ -61,16 +35,6 @@ export default async function handler(req, res) {
                 emoji: true
               },
               value: "placeholder"
-            },
-            {
-              type: "button",
-              action_id: "download_chart",
-              text: {
-                type: "plain_text",
-                text: "📅 Download",
-                emoji: true
-              },
-              url: data.chart_url
             }
           ]
         }
@@ -92,6 +56,7 @@ export default async function handler(req, res) {
       throw new Error(`Slack API error: ${slackData.error}`);
     }
 
+    // Step 2: Create final value with channel + ts
     const fullValue = JSON.stringify({
       channel: slackData.channel,
       ts: slackData.ts,
@@ -108,8 +73,9 @@ export default async function handler(req, res) {
       chart_url: data.chart_url
     });
 
-    const updatedBlocks = initialPayload.blocks;
-    updatedBlocks[2].elements[0].value = fullValue; // Attach data to button if needed
+    // Step 3: Update original message with final value in button
+    const finalBlocks = initialPayload.blocks;
+    finalBlocks[2].elements[0].value = fullValue;
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
@@ -120,7 +86,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         channel: slackData.channel,
         ts: slackData.ts,
-        blocks: updatedBlocks,
+        blocks: finalBlocks,
         text: initialPayload.text
       })
     });
@@ -129,7 +95,7 @@ export default async function handler(req, res) {
       ok: true,
       channel: slackData.channel,
       ts: slackData.ts,
-      message: "Chart sent and updated."
+      message: "Chart sent and button updated."
     });
   } catch (err) {
     console.error("Error posting to Slack:", err);
