@@ -5,7 +5,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
 
-  // Helper: Determine performance status
   function getPerformanceStatus(actual, target, baseline) {
     const diffToTarget = (actual - target) / target;
 
@@ -16,7 +15,6 @@ export default async function handler(req, res) {
     return "OffTrack";
   }
 
-  // Helper: Format value based on metric type
   function formatValue(value, type) {
     if (typeof value !== 'number') return value;
 
@@ -31,7 +29,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // Helper: Build one-line summary message
   function buildNarrative(status, actual, target, baseline, metricName, location, metricType) {
     const actualFormatted = formatValue(actual, metricType);
     const targetFormatted = formatValue(target, metricType);
@@ -51,12 +48,10 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // Core numeric inputs
     const actual = Number(data.results);
     const target = Number(data.target);
     const baseline = Number(data.baseline);
 
-    // Descriptive and contextual inputs
     const metricName = data.title;
     const location = data.labels;
     const period = data.period;
@@ -66,14 +61,12 @@ export default async function handler(req, res) {
     const timestamp = data.timestamp;
     const chartUrl = data.chart_url;
 
-    // Use correct key: "metric" for metric type
-    const metricType = data.metric || "count"; // "percentage" | "dollar" | "count"
+    const metricType = data.metric || "count";
     const type = data.type || "";
     const targetFormatted = data.targetFormatted || "";
     const baselineFormatted = data.baselineFormatted || "";
     const performanceStatus = data.performanceStatus || "";
 
-    // Status & message generation
     const status = getPerformanceStatus(actual, target, baseline);
     const messageSummary = buildNarrative(
       status,
@@ -85,13 +78,11 @@ export default async function handler(req, res) {
       metricType
     );
 
-    // Set button label based on performance
     const sendButtonText =
       status === "Ahead" || status === "OnTrack"
         ? "Share Win With Employee"
         : "Send to Employee";
 
-    // Step 1: Send initial message
     const initialPayload = {
       channel: "C08QXCVUH6Y",
       text:
@@ -143,6 +134,15 @@ export default async function handler(req, res) {
               value: "placeholder"
             },
             {
+              type: "users_select",
+              action_id: "select_recipient",
+              placeholder: {
+                type: "plain_text",
+                text: sendButtonText,
+                emoji: false
+              }
+            },
+            {
               type: "button",
               action_id: "send_to_selected_user",
               text: {
@@ -154,28 +154,10 @@ export default async function handler(req, res) {
               value: "placeholder"
             }
           ]
-        },
-        {
-          type: "section",
-          block_id: "select_user_section",
-          text: {
-            type: "mrkdwn",
-            text: sendButtonText
-          },
-          accessory: {
-            type: "users_select",
-            action_id: "select_recipient",
-            placeholder: {
-              type: "plain_text",
-              text: "Select a team member",
-              emoji: false
-            }
-          }
         }
       ]
     };
 
-    // Post the message
     const postRes = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
@@ -190,7 +172,6 @@ export default async function handler(req, res) {
       throw new Error(`Slack API error: ${postJson.error}`);
     }
 
-    // Step 2: Build the full payload for button values
     const fullValue = JSON.stringify({
       channel: postJson.channel,
       ts: postJson.ts,
@@ -212,11 +193,10 @@ export default async function handler(req, res) {
       performanceStatus
     });
 
-    // Step 3: Update the buttons with the real payload
     const updatedBlocks = initialPayload.blocks;
     const actionElems = updatedBlocks[4].elements;
     actionElems[0].value = fullValue; // Plan My Actions
-    actionElems[1].value = fullValue; // Send File
+    actionElems[2].value = fullValue; // Send File
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
