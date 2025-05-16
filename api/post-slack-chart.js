@@ -115,13 +115,6 @@ This is a critical moment to step in and redirect.`
           type: "section",
           text: {
             type: "mrkdwn",
-            text: messageSummary
-          }
-        },
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
             text: "Here's the chart:"
           }
         },
@@ -129,6 +122,13 @@ This is a critical moment to step in and redirect.`
           type: "image",
           image_url: chartUrl,
           alt_text: `${metricName} chart`
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: messageSummary
+          }
         },
         {
           type: "section",
@@ -205,7 +205,7 @@ This is a critical moment to step in and redirect.`
       period,
       timestamp,
       chart_url: chartUrl,
-      metric: metricType, // ← this is your type value now
+      metric: metricType,
       type,
       targetFormatted,
       baselineFormatted,
@@ -243,4 +243,4 @@ This is a critical moment to step in and redirect.`
     console.error("Error posting to Slack:", err);
     return res.status(500).json({ error: "Internal Server Error", detail: err.message });
   }
-}
+}  
