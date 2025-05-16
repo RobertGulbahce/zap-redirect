@@ -85,6 +85,12 @@ export default async function handler(req, res) {
       metricType
     );
 
+    // Set button label based on performance
+    const sendButtonText =
+      status === "Ahead" || status === "OnTrack"
+        ? "Share Win With Employee"
+        : "Send to Employee";
+
     // Step 1: Send initial message
     const initialPayload = {
       channel: "C08QXCVUH6Y",
@@ -141,7 +147,7 @@ export default async function handler(req, res) {
               action_id: "select_recipient",
               placeholder: {
                 type: "plain_text",
-                text: "Send to employee",
+                text: sendButtonText,
                 emoji: false
               }
             },
