@@ -143,15 +143,6 @@ export default async function handler(req, res) {
               value: "placeholder"
             },
             {
-              type: "users_select",
-              action_id: "select_recipient",
-              placeholder: {
-                type: "plain_text",
-                text: sendButtonText,
-                emoji: false
-              }
-            },
-            {
               type: "button",
               action_id: "send_to_selected_user",
               text: {
@@ -163,6 +154,23 @@ export default async function handler(req, res) {
               value: "placeholder"
             }
           ]
+        },
+        {
+          type: "section",
+          block_id: "select_user_section",
+          text: {
+            type: "mrkdwn",
+            text: sendButtonText
+          },
+          accessory: {
+            type: "users_select",
+            action_id: "select_recipient",
+            placeholder: {
+              type: "plain_text",
+              text: "Select a team member",
+              emoji: false
+            }
+          }
         }
       ]
     };
@@ -208,7 +216,7 @@ export default async function handler(req, res) {
     const updatedBlocks = initialPayload.blocks;
     const actionElems = updatedBlocks[4].elements;
     actionElems[0].value = fullValue; // Plan My Actions
-    actionElems[2].value = fullValue; // Send File
+    actionElems[1].value = fullValue; // Send File
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
