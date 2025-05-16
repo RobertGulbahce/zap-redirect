@@ -91,14 +91,14 @@ export default async function handler(req, res) {
         `*Location:* ${location}\n` +
         `*Requested by:* ${user}\n\n` +
         `${messageSummary}\n\n` +
-        `Here's the chart:\n\n` +
+        `Here's the chart (sent by ${user}):\n\n` +
         `Plan your next steps:`,
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: "Here's the chart:"
+            text: `Here's the chart (sent by ${user}):`
           }
         },
         {
