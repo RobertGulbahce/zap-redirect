@@ -16,11 +16,26 @@ export default async function handler(req, res) {
     return "OffTrack";
   }
 
-  // Helper: Build message based on status
-  function buildNarrative(status, actual, target, baseline, metric, location) {
-    const actualFormatted = `$${Number(actual).toLocaleString()}`;
-    const targetFormatted = `$${Number(target).toLocaleString()}`;
-    const baselineFormatted = `$${Number(baseline).toLocaleString()}`;
+  // Helper: Format value based on metric type
+  function formatValue(value, type) {
+    if (typeof value !== 'number') return value;
+
+    switch (type) {
+      case "percentage":
+        return `${Math.round(value)}%`;
+      case "dollar":
+        return `$${Math.round(value).toLocaleString()}`;
+      case "count":
+      default:
+        return `${Math.round(value).toLocaleString()}`;
+    }
+  }
+
+  // Helper: Build summary message
+  function buildNarrative(status, actual, target, baseline, metric, location, metricType) {
+    const actualFormatted = formatValue(actual, metricType);
+    const targetFormatted = formatValue(target, metricType);
+    const baselineFormatted = formatValue(baseline, metricType);
 
     const templates = {
       Ahead: `✅ ${location} is ahead of target  
@@ -49,28 +64,49 @@ This is a critical moment to step in and redirect.`
 
   try {
     const data = req.body;
+
+    // Core numeric inputs
     const actual = Number(data.results);
     const target = Number(data.target);
     const baseline = Number(data.baseline);
 
+    // Descriptive and contextual inputs
+    const metric = data.title;
+    const location = data.labels;
+    const period = data.period;
+    const user = data.user;
+    const owner = data.owner;
+    const row = data.row;
+    const timestamp = data.timestamp;
+    const chartUrl = data.chart_url;
+
+    // Extended fields
+    const metricType = data.metric_type || "count"; // percentage | dollar | count
+    const type = data.type || "";
+    const targetFormatted = data.targetFormatted || "";
+    const baselineFormatted = data.baselineFormatted || "";
+    const performanceStatus = data.performanceStatus || "";
+
+    // Status & message generation
     const status = getPerformanceStatus(actual, target, baseline);
     const messageSummary = buildNarrative(
       status,
       actual,
       target,
       baseline,
-      data.title,
-      data.labels
+      metric,
+      location,
+      metricType
     );
 
     // Step 1: Send initial message
     const initialPayload = {
       channel: "C08QXCVUH6Y",
       text:
-        `*${data.title}* report  \n` +
-        `*Date:* ${data.period}  \n` +
-        `*Location:* ${data.labels}  \n` +
-        `*Requested by:* ${data.user}\n\n` +
+        `*${metric}* report  \n` +
+        `*Date:* ${period}  \n` +
+        `*Location:* ${location}  \n` +
+        `*Requested by:* ${user}\n\n` +
         `${messageSummary}\n\n` +
         `Here's the chart:\n\n` +
         `Plan your next steps:`,
@@ -91,8 +127,8 @@ This is a critical moment to step in and redirect.`
         },
         {
           type: "image",
-          image_url: data.chart_url,
-          alt_text: `${data.title} chart`
+          image_url: chartUrl,
+          alt_text: `${metric} chart`
         },
         {
           type: "section",
@@ -148,6 +184,7 @@ This is a critical moment to step in and redirect.`
       },
       body: JSON.stringify(initialPayload)
     });
+
     const postJson = await postRes.json();
     if (!postJson.ok) {
       throw new Error(`Slack API error: ${postJson.error}`);
@@ -157,17 +194,22 @@ This is a critical moment to step in and redirect.`
     const fullValue = JSON.stringify({
       channel: postJson.channel,
       ts: postJson.ts,
-      owner: data.owner,
-      user: data.user,
-      row: data.row,
-      labels: data.labels,
-      results: data.results,
-      target: data.target,
-      baseline: data.baseline,
-      title: data.title,
-      period: data.period,
-      timestamp: data.timestamp,
-      chart_url: data.chart_url
+      owner,
+      user,
+      row,
+      labels: location,
+      results: actual,
+      target,
+      baseline,
+      title: metric,
+      period,
+      timestamp,
+      chart_url: chartUrl,
+      metric_type: metricType,
+      type,
+      targetFormatted,
+      baselineFormatted,
+      performanceStatus
     });
 
     // Step 3: Update the buttons with the real payload
