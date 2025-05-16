@@ -72,7 +72,7 @@ _Target:_ ${data.target} │ Baseline: ${data.baseline}`
               action_id: "select_recipient",
               placeholder: {
                 type: "plain_text",
-                text: "Choose a user",
+                text: "Send to employee",
                 emoji: false
               }
             },
