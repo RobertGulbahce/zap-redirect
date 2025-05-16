@@ -1,3 +1,5 @@
+// File: /api/post-slack-chart.js
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
@@ -6,7 +8,7 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // Step 1: Send initial message without full value
+    // Step 1: Send initial message without full values
     const initialPayload = {
       channel: "C08QXCVUH6Y",
       text: `Here's today's ${data.title} report:`,
@@ -31,9 +33,20 @@ export default async function handler(req, res) {
               action_id: "start_plan",
               text: {
                 type: "plain_text",
-                text: "📝 Plan My Actions",
-                emoji: true
+                text: "Plan My Actions",
+                emoji: false
               },
+              value: "placeholder"
+            },
+            {
+              type: "button",
+              action_id: "send_to_user",
+              text: {
+                type: "plain_text",
+                text: "Send to User",
+                emoji: false
+              },
+              style: "primary",
               value: "placeholder"
             }
           ]
@@ -51,12 +64,11 @@ export default async function handler(req, res) {
     });
 
     const slackData = await slackRes.json();
-
     if (!slackData.ok) {
       throw new Error(`Slack API error: ${slackData.error}`);
     }
 
-    // Step 2: Create final value with channel + ts
+    // Step 2: Build full value payload
     const fullValue = JSON.stringify({
       channel: slackData.channel,
       ts: slackData.ts,
@@ -73,9 +85,10 @@ export default async function handler(req, res) {
       chart_url: data.chart_url
     });
 
-    // Step 3: Update original message with final value in button
+    // Step 3: Update both buttons with the full value
     const finalBlocks = initialPayload.blocks;
-    finalBlocks[2].elements[0].value = fullValue;
+    finalBlocks[2].elements[0].value = fullValue;  // Plan My Actions
+    finalBlocks[2].elements[1].value = fullValue;  // Send to User
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
@@ -95,8 +108,9 @@ export default async function handler(req, res) {
       ok: true,
       channel: slackData.channel,
       ts: slackData.ts,
-      message: "Chart sent and button updated."
+      message: "Chart sent and buttons updated."
     });
+
   } catch (err) {
     console.error("Error posting to Slack:", err);
     return res.status(500).json({ error: "Internal Server Error", detail: err.message });
