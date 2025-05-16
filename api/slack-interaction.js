@@ -24,7 +24,6 @@ export default async function handler(req, res) {
         confidence: values.confidence_block.confidence_input.selected_option.value
       };
 
-      // 🧵 Post the summary back in the thread
       await fetch('https://slack.com/api/chat.postMessage', {
         method: 'POST',
         headers: {
@@ -42,19 +41,18 @@ export default async function handler(req, res) {
     }
 
     //
-    // 2) Handle block actions (buttons + user-picker)
+    // 2) Handle block actions
     //
     if (payload.type === 'block_actions') {
       const action = payload.actions[0];
 
       //
-      // 2a) User picked a recipient – update the "Send Chart" button
+      // 2a) User picked a recipient
       //
       if (action.action_id === 'select_recipient') {
         const selectedUser = action.selected_user;
         const blocks = JSON.parse(JSON.stringify(payload.message.blocks));
         const actionsBlock = blocks.find(b => b.type === 'actions');
-
         const sendBtn = actionsBlock.elements.find(el => el.action_id === 'send_to_selected_user');
         const existing = sendBtn.value ? JSON.parse(sendBtn.value) : {};
         sendBtn.value = JSON.stringify({ ...existing, send_to: selectedUser });
@@ -77,7 +75,7 @@ export default async function handler(req, res) {
       }
 
       //
-      // 2b) "Send Chart" button clicked – DM the chart to selected user
+      // 2b) "Send File" clicked
       //
       if (action.action_id === 'send_to_selected_user') {
         const data = JSON.parse(action.value || '{}');
@@ -92,6 +90,7 @@ export default async function handler(req, res) {
           });
         }
 
+        // 1. Open a DM
         const conv = await fetch('https://slack.com/api/conversations.open', {
           method: 'POST',
           headers: {
@@ -102,9 +101,23 @@ export default async function handler(req, res) {
         }).then(r => r.json());
 
         if (!conv.ok) throw new Error(conv.error);
-
         const dmChannel = conv.channel.id;
 
+        // 2. Fetch channel name (optional)
+        const info = await fetch('https://slack.com/api/conversations.info', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ channel: dmChannel })
+        }).then(r => r.json());
+
+        const readableName = info.ok && info.channel?.name
+          ? info.channel.name
+          : 'direct message';
+
+        // 3. Send chart to DM
         await fetch('https://slack.com/api/chat.postMessage', {
           method: 'POST',
           headers: {
@@ -124,11 +137,25 @@ export default async function handler(req, res) {
           })
         });
 
+        // 4. Confirm back in thread
+        await fetch('https://slack.com/api/chat.postMessage', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            channel: payload.container.channel_id,
+            thread_ts: payload.container.message_ts,
+            text: `✅ Chart sent to <@${recipient}> via ${readableName}`
+          })
+        });
+
         return res.status(200).end();
       }
 
       //
-      // 2c) "Plan My Actions" button clicked – open modal
+      // 2c) Plan My Actions
       //
       if (action.action_id === 'start_plan') {
         const triggerId = payload.trigger_id;
