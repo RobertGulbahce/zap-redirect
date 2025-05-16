@@ -8,16 +8,25 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // --- Step 1: Post initial message with placeholder values ---
+    // Step 1: Send initial message without full values
     const initialPayload = {
       channel: "C08QXCVUH6Y",
-      text: `Here's today's ${data.title} report:`,
+      // plain-text fallback
+      text: `*${data.title}* report  
+*Focus:* ${data.labels}  
+*Requested by:* ${data.user}  
+
+Here's today's *${data.title}* data:`,
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `Here's today's *${data.title}* report:`
+            text:
+              `*${data.title}* report\n` +
+              `*Focus:* ${data.labels}\n` +
+              `*Requested by:* ${data.user}\n\n` +
+              `Here's today's *${data.title}* data:`
           }
         },
         {
@@ -63,6 +72,7 @@ export default async function handler(req, res) {
       ]
     };
 
+    // Post the message
     const postRes = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
@@ -76,7 +86,7 @@ export default async function handler(req, res) {
       throw new Error(`Slack API error: ${postJson.error}`);
     }
 
-    // --- Step 2: Build the full payload for button values ---
+    // Step 2: Build the full payload for button values
     const fullValue = JSON.stringify({
       channel: postJson.channel,
       ts: postJson.ts,
@@ -93,10 +103,9 @@ export default async function handler(req, res) {
       chart_url: data.chart_url
     });
 
-    // --- Step 3: Update the buttons with the real payload ---
+    // Step 3: Update the buttons with the real payload
     const updatedBlocks = initialPayload.blocks;
     const actionElems = updatedBlocks[2].elements;
-
     actionElems[0].value = fullValue; // Plan My Actions
     actionElems[2].value = fullValue; // Send File
 
@@ -118,7 +127,7 @@ export default async function handler(req, res) {
       ok: true,
       channel: postJson.channel,
       ts: postJson.ts,
-      message: "Chart posted and buttons updated."
+      message: "Chart sent and buttons updated."
     });
 
   } catch (err) {
