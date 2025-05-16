@@ -12,10 +12,31 @@ export default async function handler(req, res) {
     // 1) Handle the modal submission (weekly plan)
     //
     if (payload.type === 'view_submission' && payload.view.callback_id === 'weekly_plan_modal') {
-      const summary = payload.view.state.values.plan_input_block.plan_input.value;
-      const userId = payload.user.id;
+      const values = payload.view.state.values;
+      const user = payload.user.id;
+      const metadata = JSON.parse(payload.view.private_metadata || '{}');
 
-      console.log(`✅ Weekly plan submitted by ${userId}:`, summary);
+      const response = {
+        user,
+        goal: values.goal_block.goal_input.value,
+        move: values.move_block.move_input.value,
+        ownership: values.ownership_block?.ownership_input?.value || '',
+        confidence: values.confidence_block.confidence_input.selected_option.value
+      };
+
+      // 🧵 Post the plan back to the original thread
+      await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          channel: metadata.channel,
+          thread_ts: metadata.ts,
+          text: `📝 <@${user}> just submitted a weekly plan:\n• *Goal:* ${response.goal}\n• *Action:* ${response.move}\n• *Ownership:* ${response.ownership}\n• *Confidence:* ${response.confidence}/10`
+        })
+      });
 
       return res.status(200).json({ response_action: 'clear' });
     }
@@ -126,7 +147,7 @@ export default async function handler(req, res) {
               callback_id: 'weekly_plan_modal',
               title: {
                 type: 'plain_text',
-                text: 'Weekly Plan'
+                text: 'Plan My Actions'
               },
               submit: {
                 type: 'plain_text',
@@ -136,23 +157,86 @@ export default async function handler(req, res) {
                 type: 'plain_text',
                 text: 'Cancel'
               },
-              private_metadata: JSON.stringify(data),
+              private_metadata: JSON.stringify({
+                ...data,
+                channel: payload.container.channel_id,
+                ts: payload.container.message_ts
+              }),
               blocks: [
                 {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: `📊 *${data.title}* for *${data.labels}*\nTarget: *${data.target}* │ Result: *${data.results}*`
+                  }
+                },
+                {
                   type: 'input',
-                  block_id: 'plan_input_block',
+                  block_id: 'goal_block',
                   element: {
                     type: 'plain_text_input',
-                    action_id: 'plan_input',
-                    multiline: true,
+                    action_id: 'goal_input',
                     placeholder: {
                       type: 'plain_text',
-                      text: 'What’s one move you could make this week?'
+                      text: 'E.g. Improve acceptance rate by 5%'
                     }
                   },
                   label: {
                     type: 'plain_text',
-                    text: 'Your focus for the week'
+                    text: 'What’s your goal for this result?'
+                  }
+                },
+                {
+                  type: 'input',
+                  block_id: 'move_block',
+                  element: {
+                    type: 'plain_text_input',
+                    action_id: 'move_input',
+                    multiline: true,
+                    placeholder: {
+                      type: 'plain_text',
+                      text: 'What’s one move you could make this week to support this result?'
+                    }
+                  },
+                  label: {
+                    type: 'plain_text',
+                    text: 'Weekly action'
+                  }
+                },
+                {
+                  type: 'input',
+                  block_id: 'ownership_block',
+                  element: {
+                    type: 'plain_text_input',
+                    action_id: 'ownership_input',
+                    placeholder: {
+                      type: 'plain_text',
+                      text: 'E.g. Focus more on plan presentation...'
+                    }
+                  },
+                  label: {
+                    type: 'plain_text',
+                    text: 'What would “10/10 ownership” of this result look like?'
+                  },
+                  optional: true
+                },
+                {
+                  type: 'input',
+                  block_id: 'confidence_block',
+                  element: {
+                    type: 'static_select',
+                    action_id: 'confidence_input',
+                    options: Array.from({ length: 10 }, (_, i) => ({
+                      text: {
+                        type: 'plain_text',
+                        text: `${i + 1}/10`
+                      },
+                      value: `${i + 1}`
+                    }))
+                  },
+                  label: {
+                    type: 'plain_text',
+                    text: 'How confident are you this result will improve?'
                   }
                 }
               ]
@@ -163,11 +247,10 @@ export default async function handler(req, res) {
         return res.status(200).end();
       }
 
-      // fallback
-      return res.status(200).end();
+      return res.status(200).end(); // fallback
     }
 
-    return res.status(200).end();
+    return res.status(200).end(); // default
   } catch (err) {
     console.error('❌ Slack handler error:', err);
     return res.status(500).json({ error: 'Internal Server Error', detail: err.message });
