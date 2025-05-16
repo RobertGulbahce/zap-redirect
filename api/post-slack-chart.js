@@ -31,32 +31,18 @@ export default async function handler(req, res) {
     }
   }
 
-  // Helper: Build summary message
+  // Helper: Build one-line summary message
   function buildNarrative(status, actual, target, baseline, metricName, location, metricType) {
     const actualFormatted = formatValue(actual, metricType);
     const targetFormatted = formatValue(target, metricType);
     const baselineFormatted = formatValue(baseline, metricType);
 
     const templates = {
-      Ahead: `✅ ${location} is ahead of target  
-${metricName} reached ${actualFormatted}, outperforming the ${targetFormatted} target and the ${baselineFormatted} baseline.  
-Now’s the time to build on this momentum.`,
-
-      OnTrack: `⚖️ ${location} is on track  
-${metricName} came in at ${actualFormatted}, right around the ${targetFormatted} goal and comfortably above the ${baselineFormatted}.  
-Steady performance — let’s keep it up.`,
-
-      SlightlyBehind: `⚠️ ${location} is slightly behind target  
-${metricName} reached ${actualFormatted}, just under the ${targetFormatted} but still ahead of the ${baselineFormatted}.  
-A small nudge could make the difference.`,
-
-      FallingBehind: `🔻 ${location} is underperforming  
-${metricName} was ${actualFormatted}, below the target of ${targetFormatted} and trailing the ${baselineFormatted}.  
-Let’s rally support and take action early.`,
-
-      OffTrack: `🔴 ${location} is off track  
-${metricName} fell to ${actualFormatted}, well below the ${targetFormatted} and the ${baselineFormatted}.  
-This is a critical moment to step in and redirect.`
+      Ahead: `✅ ${location} is ahead of target — ${metricName} reached ${actualFormatted}, outperforming the ${targetFormatted} target and the ${baselineFormatted} baseline. Now’s the time to build on this momentum.`,
+      OnTrack: `⚖️ ${location} is on track — ${metricName} came in at ${actualFormatted}, right around the ${targetFormatted} goal and comfortably above the ${baselineFormatted}. Steady performance — let’s keep it up.`,
+      SlightlyBehind: `⚠️ ${location} is slightly behind target — ${metricName} reached ${actualFormatted}, just under the ${targetFormatted} but still ahead of the ${baselineFormatted}. A small nudge could make the difference.`,
+      FallingBehind: `🔻 ${location} is underperforming — ${metricName} was ${actualFormatted}, below the target of ${targetFormatted} and trailing the ${baselineFormatted}. Let’s rally support and take action early.`,
+      OffTrack: `🔴 ${location} is off track — ${metricName} fell to ${actualFormatted}, well below the ${targetFormatted} and the ${baselineFormatted}. This is a critical moment to step in and redirect.`
     };
 
     return templates[status];
@@ -103,9 +89,9 @@ This is a critical moment to step in and redirect.`
     const initialPayload = {
       channel: "C08QXCVUH6Y",
       text:
-        `*${metricName}* report  \n` +
-        `*Date:* ${period}  \n` +
-        `*Location:* ${location}  \n` +
+        `*${metricName}* report\n` +
+        `*Date:* ${period}\n` +
+        `*Location:* ${location}\n` +
         `*Requested by:* ${user}\n\n` +
         `${messageSummary}\n\n` +
         `Here's the chart:\n\n` +
@@ -243,4 +229,4 @@ This is a critical moment to step in and redirect.`
     console.error("Error posting to Slack:", err);
     return res.status(500).json({ error: "Internal Server Error", detail: err.message });
   }
-}  
+}
