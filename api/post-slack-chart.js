@@ -147,7 +147,7 @@ export default async function handler(req, res) {
               action_id: "send_to_selected_user",
               text: {
                 type: "plain_text",
-                text: "Send File",
+                text: "Send Chart",
                 emoji: false
               },
               style: "primary",
@@ -196,7 +196,7 @@ export default async function handler(req, res) {
     const updatedBlocks = initialPayload.blocks;
     const actionElems = updatedBlocks[4].elements;
     actionElems[0].value = fullValue; // Plan My Actions
-    actionElems[2].value = fullValue; // Send File
+    actionElems[2].value = fullValue; // Send Chart
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
