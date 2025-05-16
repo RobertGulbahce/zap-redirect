@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // Step 1: Send initial message without full values
+    // --- Step 1: Post initial message with placeholder values ---
     const initialPayload = {
       channel: "C08QXCVUH6Y",
       text: `Here's today's ${data.title} report:`,
@@ -39,11 +39,20 @@ export default async function handler(req, res) {
               value: "placeholder"
             },
             {
+              type: "users_select",
+              action_id: "select_recipient",
+              placeholder: {
+                type: "plain_text",
+                text: "Choose a user",
+                emoji: false
+              }
+            },
+            {
               type: "button",
-              action_id: "send_to_user",
+              action_id: "send_to_selected_user",
               text: {
                 type: "plain_text",
-                text: "Send to User",
+                text: "Send File",
                 emoji: false
               },
               style: "primary",
@@ -54,7 +63,7 @@ export default async function handler(req, res) {
       ]
     };
 
-    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
+    const postRes = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
@@ -62,16 +71,15 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify(initialPayload)
     });
-
-    const slackData = await slackRes.json();
-    if (!slackData.ok) {
-      throw new Error(`Slack API error: ${slackData.error}`);
+    const postJson = await postRes.json();
+    if (!postJson.ok) {
+      throw new Error(`Slack API error: ${postJson.error}`);
     }
 
-    // Step 2: Build full value payload
+    // --- Step 2: Build the full payload for button values ---
     const fullValue = JSON.stringify({
-      channel: slackData.channel,
-      ts: slackData.ts,
+      channel: postJson.channel,
+      ts: postJson.ts,
       owner: data.owner,
       user: data.user,
       row: data.row,
@@ -85,10 +93,12 @@ export default async function handler(req, res) {
       chart_url: data.chart_url
     });
 
-    // Step 3: Update both buttons with the full value
-    const finalBlocks = initialPayload.blocks;
-    finalBlocks[2].elements[0].value = fullValue;  // Plan My Actions
-    finalBlocks[2].elements[1].value = fullValue;  // Send to User
+    // --- Step 3: Update the buttons with the real payload ---
+    const updatedBlocks = initialPayload.blocks;
+    const actionElems = updatedBlocks[2].elements;
+
+    actionElems[0].value = fullValue; // Plan My Actions
+    actionElems[2].value = fullValue; // Send File
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
@@ -97,18 +107,18 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        channel: slackData.channel,
-        ts: slackData.ts,
-        blocks: finalBlocks,
+        channel: postJson.channel,
+        ts: postJson.ts,
+        blocks: updatedBlocks,
         text: initialPayload.text
       })
     });
 
     return res.status(200).json({
       ok: true,
-      channel: slackData.channel,
-      ts: slackData.ts,
-      message: "Chart sent and buttons updated."
+      channel: postJson.channel,
+      ts: postJson.ts,
+      message: "Chart posted and buttons updated."
     });
 
   } catch (err) {
