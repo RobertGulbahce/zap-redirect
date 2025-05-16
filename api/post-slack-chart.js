@@ -11,28 +11,48 @@ export default async function handler(req, res) {
     // Step 1: Send initial message without full values
     const initialPayload = {
       channel: "C08QXCVUH6Y",
-      // plain-text fallback
-      text: `*${data.title}* report  
-*Focus:* ${data.labels}  
-*Requested by:* ${data.user}  
-
-Here's today's *${data.title}* data:`,
+      text:
+        `*${data.title}* report  \n` +
+        `*Date:* ${data.period}  \n` +
+        `*Location:* ${data.labels}  \n` +
+        `*Requested by:* ${data.user}\n\n` +
+        `*Today's ${data.title}:* ${data.results}  \n` +
+        `_Target:_ ${data.target} │ _Baseline:_ ${data.baseline}\n\n` +
+        `Here's the chart:\n\n` +
+        `Plan your next steps:`,
       blocks: [
         {
           type: "section",
           text: {
             type: "mrkdwn",
             text:
-              `*${data.title}* report\n` +
-              `*Focus:* ${data.labels}\n` +
-              `*Requested by:* ${data.user}\n\n` +
-              `Here's today's *${data.title}* data:`
+`*${data.title}* report
+*Date:* ${data.period}
+*Location:* ${data.labels}
+*Requested by:* ${data.user}
+
+*Today's ${data.title}:* ${data.results}
+_Target:_ ${data.target} │ Baseline: ${data.baseline}`
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "Here's the chart:"
           }
         },
         {
           type: "image",
           image_url: data.chart_url,
           alt_text: `${data.title} chart`
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "*Plan your next steps:*"
+          }
         },
         {
           type: "actions",
@@ -105,7 +125,7 @@ Here's today's *${data.title}* data:`,
 
     // Step 3: Update the buttons with the real payload
     const updatedBlocks = initialPayload.blocks;
-    const actionElems = updatedBlocks[2].elements;
+    const actionElems = updatedBlocks[4].elements; // actions block is now at index 4
     actionElems[0].value = fullValue; // Plan My Actions
     actionElems[2].value = fullValue; // Send File
 
