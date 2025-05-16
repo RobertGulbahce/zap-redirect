@@ -5,10 +5,65 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
 
+  // Helper: Determine performance status
+  function getPerformanceStatus(actual, target, baseline) {
+    const diffToTarget = (actual - target) / target;
+
+    if (diffToTarget >= 0.1) return "Ahead";
+    if (diffToTarget >= -0.05) return "OnTrack";
+    if (actual >= baseline) return "SlightlyBehind";
+    if (diffToTarget >= -0.2) return "FallingBehind";
+    return "OffTrack";
+  }
+
+  // Helper: Build message based on status
+  function buildNarrative(status, actual, target, baseline, metric, location) {
+    const actualFormatted = `$${Number(actual).toLocaleString()}`;
+    const targetFormatted = `$${Number(target).toLocaleString()}`;
+    const baselineFormatted = `$${Number(baseline).toLocaleString()}`;
+
+    const templates = {
+      Ahead: `✅ ${location} is ahead of target  
+${metric} reached ${actualFormatted}, outperforming the ${targetFormatted} target and the ${baselineFormatted} baseline.  
+Now’s the time to build on this momentum.`,
+
+      OnTrack: `⚖️ ${location} is on track  
+${metric} came in at ${actualFormatted}, right around the ${targetFormatted} goal and comfortably above the ${baselineFormatted}.  
+Steady performance — let’s keep it up.`,
+
+      SlightlyBehind: `⚠️ ${location} is slightly behind target  
+${metric} reached ${actualFormatted}, just under the ${targetFormatted} but still ahead of the ${baselineFormatted}.  
+A small nudge could make the difference.`,
+
+      FallingBehind: `🔻 ${location} is underperforming  
+${metric} was ${actualFormatted}, below the target of ${targetFormatted} and trailing the ${baselineFormatted}.  
+Let’s rally support and take action early.`,
+
+      OffTrack: `🔴 ${location} is off track  
+${metric} fell to ${actualFormatted}, well below the ${targetFormatted} and the ${baselineFormatted}.  
+This is a critical moment to step in and redirect.`
+    };
+
+    return templates[status];
+  }
+
   try {
     const data = req.body;
+    const actual = Number(data.results);
+    const target = Number(data.target);
+    const baseline = Number(data.baseline);
 
-    // Step 1: Send initial message without full values
+    const status = getPerformanceStatus(actual, target, baseline);
+    const messageSummary = buildNarrative(
+      status,
+      actual,
+      target,
+      baseline,
+      data.title,
+      data.labels
+    );
+
+    // Step 1: Send initial message
     const initialPayload = {
       channel: "C08QXCVUH6Y",
       text:
@@ -16,8 +71,7 @@ export default async function handler(req, res) {
         `*Date:* ${data.period}  \n` +
         `*Location:* ${data.labels}  \n` +
         `*Requested by:* ${data.user}\n\n` +
-        `*Today's ${data.title}:* ${data.results}  \n` +
-        `_Target:_ ${data.target} │ _Baseline:_ ${data.baseline}\n\n` +
+        `${messageSummary}\n\n` +
         `Here's the chart:\n\n` +
         `Plan your next steps:`,
       blocks: [
@@ -25,14 +79,7 @@ export default async function handler(req, res) {
           type: "section",
           text: {
             type: "mrkdwn",
-            text:
-`*${data.title}* report
-*Date:* ${data.period}
-*Location:* ${data.labels}
-*Requested by:* ${data.user}
-
-*Today's ${data.title}:* ${data.results}
-_Target:_ ${data.target} │ Baseline: ${data.baseline}`
+            text: messageSummary
           }
         },
         {
@@ -125,7 +172,7 @@ _Target:_ ${data.target} │ Baseline: ${data.baseline}`
 
     // Step 3: Update the buttons with the real payload
     const updatedBlocks = initialPayload.blocks;
-    const actionElems = updatedBlocks[4].elements; // actions block is now at index 4
+    const actionElems = updatedBlocks[4].elements;
     actionElems[0].value = fullValue; // Plan My Actions
     actionElems[2].value = fullValue; // Send File
 
