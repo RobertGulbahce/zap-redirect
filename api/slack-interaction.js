@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       const action = payload.actions[0];
 
       //
-      // 2a) User picked a recipient – update the "Send File" button
+      // 2a) User picked a recipient – update the "Send Chart" button
       //
       if (action.action_id === 'select_recipient') {
         const selectedUser = action.selected_user;
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       }
 
       //
-      // 2b) "Send File" button clicked – DM the chart to selected user
+      // 2b) "Send Chart" button clicked – DM the chart to selected user
       //
       if (action.action_id === 'send_to_selected_user') {
         const data = JSON.parse(action.value || '{}');
