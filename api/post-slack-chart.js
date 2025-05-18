@@ -42,27 +42,27 @@ export default async function handler(req, res) {
     const goal = (typeof target === 'number' && target > 0) ? `the ${targetFormatted} target` : null;
 
     const performanceTemplates = {
-      Ahead:       `✅ ${location} is ahead — ${metricName} climbed to ${actualFormatted}, smashing through ${goal} and far surpassing ${redLine}. A great position — now’s the time to scale.`,
-      OnTrack:     `⚖️ ${location} is holding strong — ${metricName} landed at ${actualFormatted}, right around ${goal} and comfortably above ${redLine}. Consistency is good — but now’s the time to push further.`,
+      Ahead: `✅ ${location} is ahead — ${metricName} climbed to ${actualFormatted}, smashing through ${goal} and far surpassing ${redLine}. A great position — now’s the time to scale.`,
+      OnTrack: `⚖️ ${location} is holding strong — ${metricName} landed at ${actualFormatted}, right around ${goal} and comfortably above ${redLine}. Consistency is good — but now’s the time to push further.`,
       SlightlyBehind: `⚠️ ${location} is slightly behind — ${metricName} came in at ${actualFormatted}, just under ${goal} but still above ${redLine}. A small shift in focus can turn this around.`,
-      FallingBehind:  `🔻 ${location} is falling behind — ${metricName} reached ${actualFormatted}, trailing both ${goal} and hovering just above ${redLine}. Let's take action to avoid slipping further.`,
-      OffTrack:    `🔴 ${location} has fallen below critical thresholds — ${metricName} hit ${actualFormatted}, underperforming ${goal} and slipping beneath ${redLine}. It’s time for immediate intervention.`
+      FallingBehind: `🔻 ${location} is falling behind — ${metricName} reached ${actualFormatted}, trailing both ${goal} and hovering just above ${redLine}. Let's take action to avoid slipping further.`,
+      OffTrack: `🔴 ${location} has fallen below critical thresholds — ${metricName} hit ${actualFormatted}, underperforming ${goal} and slipping beneath ${redLine}. It’s time for immediate intervention.`
     };
 
     const complianceTemplates = {
-      Ahead:         goal
+      Ahead: goal
         ? `✅ ${location} is exceeding expectations — ${metricName} reached ${actualFormatted}, well above ${goal} and safely past ${redLine}. Great discipline — keep it steady.`
         : `✅ ${location} is exceeding expectations — ${metricName} reached ${actualFormatted}, safely past ${redLine}. Great discipline — keep it steady.`,
-      OnTrack:       goal
+      OnTrack: goal
         ? `📘 ${location} is compliant — ${metricName} came in at ${actualFormatted}, meeting ${goal} and comfortably above ${redLine}. Stay consistent.`
         : `📘 ${location} is compliant — ${metricName} came in at ${actualFormatted}, comfortably above ${redLine}. Stay consistent.`,
       SlightlyBehind: goal
         ? `⚠️ ${location} is edging close to limits — ${metricName} is at ${actualFormatted}, below ${goal} but still above ${redLine}. A quick correction can restore compliance.`
         : `⚠️ ${location} is edging close to limits — ${metricName} is at ${actualFormatted}, still above ${redLine}. A quick correction can restore compliance.`,
-      FallingBehind:  goal
+      FallingBehind: goal
         ? `🚧 ${location} is out of bounds — ${metricName} is ${actualFormatted}, trailing ${goal} and hovering near ${redLine}. Attention is needed before it worsens.`
         : `🚧 ${location} is out of bounds — ${metricName} is ${actualFormatted}, hovering near ${redLine}. Attention is needed before it worsens.`,
-      OffTrack:      goal
+      OffTrack: goal
         ? `⛔️ ${location} is below compliance — ${metricName} dropped to ${actualFormatted}, under both ${goal} and ${redLine}. Standards have not been met — this requires urgent correction.`
         : `⛔️ ${location} is below compliance — ${metricName} dropped to ${actualFormatted}, slipping beneath ${redLine}. Standards have not been met — this requires urgent correction.`
     };
@@ -140,6 +140,13 @@ export default async function handler(req, res) {
           text: {
             type: "mrkdwn",
             text: messageSummary
+          }
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*Responsibility:* ${owner}`
           }
         },
         {
@@ -224,7 +231,7 @@ export default async function handler(req, res) {
     });
 
     const updatedBlocks = initialPayload.blocks;
-    const actionElems = updatedBlocks[4].elements;
+    const actionElems = updatedBlocks[5].elements;
     actionElems[0].value = fullValue;
     actionElems[2].value = fullValue;
 
