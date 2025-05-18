@@ -27,19 +27,31 @@ export default async function handler(req, res) {
     }
   }
 
-  function buildNarrative(status, actual, target, baseline, metricName, location, metricType, kpiType, groupType) {
+  function buildNarrative(status, actual, target, baseline, metricName, location, metricType, kpiType) {
     const actualFormatted = formatValue(actual, metricType);
     const targetFormatted = formatValue(target, metricType);
     const baselineFormatted = formatValue(baseline, metricType);
 
-    const templates = {
-      Ahead: `✅ ${location} is ahead of target — ${metricName} reached ${actualFormatted}, outperforming the ${targetFormatted} target and the ${baselineFormatted} red line. Now’s the time to build on this momentum.`,
-      OnTrack: `⚖️ ${location} is on track — ${metricName} came in at ${actualFormatted}, right around the ${targetFormatted} goal and comfortably above the ${baselineFormatted} red line. Steady performance — let’s keep it up.`,
-      SlightlyBehind: `⚠️ ${location} is slightly behind target — ${metricName} reached ${actualFormatted}, just under the ${targetFormatted} but still ahead of the ${baselineFormatted} red line. A small nudge could make the difference.`,
-      FallingBehind: `🔻 ${location} is underperforming — ${metricName} was ${actualFormatted}, below the target of ${targetFormatted} and trailing the ${baselineFormatted} red line. Let’s rally support and take action early.`,
-      OffTrack: `🔴 ${location} is off track — ${metricName} fell to ${actualFormatted}, well below the ${targetFormatted} and the ${baselineFormatted} red line. This is a critical moment to step in and redirect.`
+    const redLine = `the ${baselineFormatted} red line`;
+    const goal = `the ${targetFormatted} target`;
+
+    const performanceTemplates = {
+      Ahead:       `✅ ${location} is ahead — ${metricName} climbed to ${actualFormatted}, smashing through ${goal} and far surpassing ${redLine}. A great position — now’s the time to scale.`,
+      OnTrack:     `⚖️ ${location} is holding strong — ${metricName} landed at ${actualFormatted}, right around ${goal} and comfortably above ${redLine}. Consistency is good — but now’s the time to push further.`,
+      SlightlyBehind: `⚠️ ${location} is slightly behind — ${metricName} came in at ${actualFormatted}, just under ${goal} but still above ${redLine}. A small shift in focus can turn this around.`,
+      FallingBehind:  `🔻 ${location} is falling behind — ${metricName} reached ${actualFormatted}, trailing both ${goal} and hovering just above ${redLine}. Let's take action to avoid slipping further.`,
+      OffTrack:    `🔴 ${location} has fallen below critical thresholds — ${metricName} hit ${actualFormatted}, underperforming ${goal} and slipping beneath ${redLine}. It’s time for immediate intervention.`
     };
 
+    const complianceTemplates = {
+      Ahead:       `✅ ${location} is exceeding expectations — ${metricName} reached ${actualFormatted}, well above ${goal} and safely past ${redLine}. Great discipline — keep it steady.`,
+      OnTrack:     `📘 ${location} is compliant — ${metricName} came in at ${actualFormatted}, meeting ${goal} and comfortably above ${redLine}. Stay consistent.`,
+      SlightlyBehind: `⚠️ ${location} is edging close to limits — ${metricName} is at ${actualFormatted}, below ${goal} but still above ${redLine}. A quick correction can restore compliance.`,
+      FallingBehind:  `🚧 ${location} is out of bounds — ${metricName} is ${actualFormatted}, trailing ${goal} and hovering near ${redLine}. Attention is needed before it worsens.`,
+      OffTrack:    `⛔️ ${location} is below compliance — ${metricName} dropped to ${actualFormatted}, under both ${goal} and ${redLine}. Standards have not been met — this requires urgent correction.`
+    };
+
+    const templates = kpiType === 'compliance' ? complianceTemplates : performanceTemplates;
     return templates[status];
   }
 
@@ -76,8 +88,7 @@ export default async function handler(req, res) {
       metricName,
       location,
       metricType,
-      kpiType,
-      groupType
+      kpiType
     );
 
     const sendButtonText =
@@ -226,4 +237,4 @@ export default async function handler(req, res) {
     console.error("Error posting to Slack:", err);
     return res.status(500).json({ error: "Internal Server Error", detail: err.message });
   }
-}  
+}
