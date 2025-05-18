@@ -1,5 +1,3 @@
-// File: /api/post-slack-chart.js
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
@@ -29,17 +27,17 @@ export default async function handler(req, res) {
     }
   }
 
-  function buildNarrative(status, actual, target, baseline, metricName, location, metricType) {
+  function buildNarrative(status, actual, target, baseline, metricName, location, metricType, kpiType, type) {
     const actualFormatted = formatValue(actual, metricType);
     const targetFormatted = formatValue(target, metricType);
     const baselineFormatted = formatValue(baseline, metricType);
 
     const templates = {
-      Ahead: `✅ ${location} is ahead of target — ${metricName} reached ${actualFormatted}, outperforming the ${targetFormatted} target and the ${baselineFormatted} baseline. Now’s the time to build on this momentum.`,
-      OnTrack: `⚖️ ${location} is on track — ${metricName} came in at ${actualFormatted}, right around the ${targetFormatted} goal and comfortably above the ${baselineFormatted}. Steady performance — let’s keep it up.`,
-      SlightlyBehind: `⚠️ ${location} is slightly behind target — ${metricName} reached ${actualFormatted}, just under the ${targetFormatted} but still ahead of the ${baselineFormatted}. A small nudge could make the difference.`,
-      FallingBehind: `🔻 ${location} is underperforming — ${metricName} was ${actualFormatted}, below the target of ${targetFormatted} and trailing the ${baselineFormatted}. Let’s rally support and take action early.`,
-      OffTrack: `🔴 ${location} is off track — ${metricName} fell to ${actualFormatted}, well below the ${targetFormatted} and the ${baselineFormatted}. This is a critical moment to step in and redirect.`
+      Ahead: `✅ ${location} is ahead of target — ${metricName} reached ${actualFormatted}, outperforming the ${targetFormatted} target and the ${baselineFormatted} red line. Now’s the time to build on this momentum.`,
+      OnTrack: `⚖️ ${location} is on track — ${metricName} came in at ${actualFormatted}, right around the ${targetFormatted} goal and comfortably above the ${baselineFormatted} red line. Steady performance — let’s keep it up.`,
+      SlightlyBehind: `⚠️ ${location} is slightly behind target — ${metricName} reached ${actualFormatted}, just under the ${targetFormatted} but still ahead of the ${baselineFormatted} red line. A small nudge could make the difference.`,
+      FallingBehind: `🔻 ${location} is underperforming — ${metricName} was ${actualFormatted}, below the target of ${targetFormatted} and trailing the ${baselineFormatted} red line. Let’s rally support and take action early.`,
+      OffTrack: `🔴 ${location} is off track — ${metricName} fell to ${actualFormatted}, well below the ${targetFormatted} and the ${baselineFormatted} red line. This is a critical moment to step in and redirect.`
     };
 
     return templates[status];
@@ -62,7 +60,9 @@ export default async function handler(req, res) {
     const chartUrl = data.chart_url;
 
     const metricType = data.metric || "count";
-    const type = data.type || "";
+    const kpiType = data.kpiType || ""; // ✅ NEW
+    const type = data.type || "";        // ✅ NEW
+
     const targetFormatted = data.targetFormatted || "";
     const baselineFormatted = data.baselineFormatted || "";
     const performanceStatus = data.performanceStatus || "";
@@ -75,7 +75,9 @@ export default async function handler(req, res) {
       baseline,
       metricName,
       location,
-      metricType
+      metricType,
+      kpiType,
+      type // ✅ NEW
     );
 
     const sendButtonText =
@@ -187,7 +189,8 @@ export default async function handler(req, res) {
       timestamp,
       chart_url: chartUrl,
       metric: metricType,
-      type,
+      kpiType,     // ✅ NEW
+      type,        // ✅ NEW
       targetFormatted,
       baselineFormatted,
       performanceStatus
