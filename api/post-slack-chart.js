@@ -3,7 +3,13 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
 
-  function getPerformanceStatus(actual, target, baseline) {
+  function getPerformanceStatus(actual, target, baseline, kpiType) {
+    const hasTarget = typeof target === 'number' && !isNaN(target) && target > 0;
+
+    if (kpiType === 'compliance' || !hasTarget) {
+      return actual >= baseline ? "OnTrack" : "OffTrack";
+    }
+
     const diffToTarget = (actual - target) / target;
 
     if (diffToTarget >= 0.1) return "Ahead";
@@ -33,7 +39,7 @@ export default async function handler(req, res) {
     const baselineFormatted = formatValue(baseline, metricType);
 
     const redLine = `the ${baselineFormatted} red line`;
-    const goal = target ? `the ${targetFormatted} target` : null;
+    const goal = (typeof target === 'number' && target > 0) ? `the ${targetFormatted} target` : null;
 
     const performanceTemplates = {
       Ahead:       `✅ ${location} is ahead — ${metricName} climbed to ${actualFormatted}, smashing through ${goal} and far surpassing ${redLine}. A great position — now’s the time to scale.`,
@@ -69,7 +75,7 @@ export default async function handler(req, res) {
     const data = req.body;
 
     const actual = Number(data.results);
-    const target = Number(data.target);
+    const target = data.target === "" ? undefined : Number(data.target);
     const baseline = Number(data.baseline);
 
     const metricName = data.title;
@@ -89,7 +95,7 @@ export default async function handler(req, res) {
     const baselineFormatted = data.baselineFormatted || "";
     const performanceStatus = data.performanceStatus || "";
 
-    const status = getPerformanceStatus(actual, target, baseline);
+    const status = getPerformanceStatus(actual, target, baseline, kpiType);
     const messageSummary = buildNarrative(
       status,
       actual,
