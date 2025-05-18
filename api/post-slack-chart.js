@@ -13,10 +13,10 @@ export default async function handler(req, res) {
     return "OffTrack";
   }
 
-  function formatValue(value, type) {
+  function formatValue(value, metricType) {
     if (typeof value !== 'number') return value;
 
-    switch (type) {
+    switch (metricType) {
       case "percentage":
         return `${Math.round(value)}%`;
       case "dollar":
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     }
   }
 
-  function buildNarrative(status, actual, target, baseline, metricName, location, metricType, kpiType, type) {
+  function buildNarrative(status, actual, target, baseline, metricName, location, metricType, kpiType, groupType) {
     const actualFormatted = formatValue(actual, metricType);
     const targetFormatted = formatValue(target, metricType);
     const baselineFormatted = formatValue(baseline, metricType);
@@ -59,9 +59,9 @@ export default async function handler(req, res) {
     const timestamp = data.timestamp;
     const chartUrl = data.chart_url;
 
-    const metricType = data.metric || "count";
-    const kpiType = data.kpiType || ""; // ✅ NEW
-    const type = data.type || "";        // ✅ NEW
+    const metricType = data.metricType || "count";   // ✅ renamed from metric
+    const groupType = data.groupType || "";          // ✅ renamed from type
+    const kpiType = data.kpiType || "";
 
     const targetFormatted = data.targetFormatted || "";
     const baselineFormatted = data.baselineFormatted || "";
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       location,
       metricType,
       kpiType,
-      type // ✅ NEW
+      groupType
     );
 
     const sendButtonText =
@@ -188,9 +188,9 @@ export default async function handler(req, res) {
       period,
       timestamp,
       chart_url: chartUrl,
-      metric: metricType,
-      kpiType,     // ✅ NEW
-      type,        // ✅ NEW
+      metricType,        // ✅ renamed
+      groupType,         // ✅ renamed
+      kpiType,
       targetFormatted,
       baselineFormatted,
       performanceStatus
@@ -198,8 +198,8 @@ export default async function handler(req, res) {
 
     const updatedBlocks = initialPayload.blocks;
     const actionElems = updatedBlocks[4].elements;
-    actionElems[0].value = fullValue; // Plan My Actions
-    actionElems[2].value = fullValue; // Send Chart
+    actionElems[0].value = fullValue;
+    actionElems[2].value = fullValue;
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
@@ -226,4 +226,4 @@ export default async function handler(req, res) {
     console.error("Error posting to Slack:", err);
     return res.status(500).json({ error: "Internal Server Error", detail: err.message });
   }
-}
+}  
