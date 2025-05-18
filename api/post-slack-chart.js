@@ -188,8 +188,8 @@ export default async function handler(req, res) {
       period,
       timestamp,
       chart_url: chartUrl,
-      metricType,        // ✅ renamed
-      groupType,         // ✅ renamed
+      metricType,
+      groupType,
       kpiType,
       targetFormatted,
       baselineFormatted,
