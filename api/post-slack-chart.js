@@ -59,8 +59,8 @@ export default async function handler(req, res) {
     const timestamp = data.timestamp;
     const chartUrl = data.chart_url;
 
-    const metricType = data.metricType || "count";   // ✅ renamed from metric
-    const groupType = data.groupType || "";          // ✅ renamed from type
+    const metricType = data.metricType || "count";
+    const groupType = data.groupType || "";
     const kpiType = data.kpiType || "";
 
     const targetFormatted = data.targetFormatted || "";
