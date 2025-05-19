@@ -112,43 +112,46 @@ export default async function handler(req, res) {
         ? "Share Win With Employee"
         : "Send to Employee";
 
-    const initialPayload = {
-      channel: "C08QXCVUH6Y",
-      text:
-        `*${metricName}* report\n` +
-        `*Date:* ${period}\n` +
-        `*Location:* ${location}\n` +
-        `*Requested by:* ${user}\n\n` +
-        `${messageSummary}\n\n` +
-        `Here's the chart (sent by ${user}):\n\n` +
-        `Plan your next steps:`,
-      blocks: [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `Here's the chart (sent by ${user}):`
-          }
-        },
-        {
-          type: "image",
-          image_url: chartUrl,
-          alt_text: `${metricName} chart`
-        },
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: messageSummary
-          }
-        },
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `*Responsibility:* ${owner}`
-          }
-        },
+    const blocks = [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `Here's the chart (sent by ${user}):`
+        }
+      },
+      {
+        type: "image",
+        image_url: chartUrl,
+        alt_text: `${metricName} chart`
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: messageSummary
+        }
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*Responsibility:* ${owner}`
+        }
+      }
+    ];
+
+    if (groupType === "grouped") {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text:
+            "_Tip: This chart compares multiple performers side-by-side. To plan actions or give feedback, click into each one individually from the Heartbeat dashboard._"
+        }
+      });
+    } else {
+      blocks.push(
         {
           type: "section",
           text: {
@@ -191,7 +194,19 @@ export default async function handler(req, res) {
             }
           ]
         }
-      ]
+      );
+    }
+
+    const initialPayload = {
+      channel: "C08QXCVUH6Y",
+      text:
+        `*${metricName}* report\n` +
+        `*Date:* ${period}\n` +
+        `*Location:* ${location}\n` +
+        `*Requested by:* ${user}\n\n` +
+        `${messageSummary}\n\n` +
+        `Here's the chart (sent by ${user}):`,
+      blocks
     };
 
     const postRes = await fetch("https://slack.com/api/chat.postMessage", {
@@ -230,10 +245,11 @@ export default async function handler(req, res) {
       performanceStatus
     });
 
-    const updatedBlocks = initialPayload.blocks;
-    const actionElems = updatedBlocks[5].elements;
-    actionElems[0].value = fullValue;
-    actionElems[2].value = fullValue;
+    const actionElems = blocks.find(b => b.type === "actions")?.elements;
+    if (actionElems) {
+      actionElems[0].value = fullValue;
+      actionElems[2].value = fullValue;
+    }
 
     await fetch("https://slack.com/api/chat.update", {
       method: "POST",
@@ -244,7 +260,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         channel: postJson.channel,
         ts: postJson.ts,
-        blocks: updatedBlocks,
+        blocks,
         text: initialPayload.text
       })
     });
