@@ -5,13 +5,11 @@ export default async function handler(req, res) {
 
   function getPerformanceStatus(actual, target, baseline, kpiType) {
     const hasTarget = typeof target === 'number' && !isNaN(target) && target > 0;
-
     if (kpiType === 'compliance' || !hasTarget) {
       return actual >= baseline ? "OnTrack" : "OffTrack";
     }
 
     const diffToTarget = (actual - target) / target;
-
     if (diffToTarget >= 0.1) return "Ahead";
     if (diffToTarget >= -0.05) return "OnTrack";
     if (actual >= baseline) return "SlightlyBehind";
@@ -21,7 +19,6 @@ export default async function handler(req, res) {
 
   function formatValue(value, metricType) {
     if (typeof value !== 'number') return value;
-
     switch (metricType) {
       case "percentage":
         return `${Math.round(value)}%`;
@@ -37,7 +34,6 @@ export default async function handler(req, res) {
     const actualFormatted = formatValue(actual, metricType);
     const targetFormatted = formatValue(target, metricType);
     const baselineFormatted = formatValue(baseline, metricType);
-
     const redLine = `the ${baselineFormatted} red line`;
     const goal = (typeof target === 'number' && target > 0) ? `the ${targetFormatted} target` : null;
 
@@ -73,7 +69,6 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
-
     const actual = Number(data.results);
     const target = data.target === "" ? undefined : Number(data.target);
     const baseline = Number(data.baseline);
@@ -125,89 +120,72 @@ export default async function handler(req, res) {
         image_url: chartUrl,
         alt_text: `${metricName} chart`
       },
-      {
+      ...(groupType !== "grouped" ? [{
         type: "section",
         text: {
           type: "mrkdwn",
           text: messageSummary
         }
-      },
+      }] : []),
       {
         type: "section",
         text: {
           type: "mrkdwn",
           text: `*Responsibility:* ${owner}`
         }
-      }
-    ];
-
-    if (groupType === "grouped") {
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text:
-            "_Tip: This chart compares multiple performers side-by-side. To plan actions or give feedback, click into each one individually from the Heartbeat dashboard._"
-        }
-      });
-    } else {
-      blocks.push(
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: "*Plan your next steps:*"
-          }
-        },
-        {
-          type: "actions",
-          elements: [
-            {
-              type: "button",
-              action_id: "start_plan",
-              text: {
-                type: "plain_text",
-                text: "Plan My Actions",
-                emoji: false
-              },
-              value: "placeholder"
-            },
-            {
-              type: "users_select",
-              action_id: "select_recipient",
-              placeholder: {
-                type: "plain_text",
-                text: sendButtonText,
-                emoji: false
-              }
-            },
-            {
-              type: "button",
-              action_id: "send_to_selected_user",
-              text: {
-                type: "plain_text",
-                text: "Send Chart",
-                emoji: false
-              },
-              style: "primary",
-              value: "placeholder"
+      },
+      ...(groupType === "grouped"
+        ? [{
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "💡 *Tip:* This chart compares multiple performers side-by-side. To plan actions or give feedback, click into each one individually from the Heartbeat dashboard."
             }
-          ]
-        }
-      );
-    }
-
-    const initialPayload = {
-      channel: "C08QXCVUH6Y",
-      text:
-        `*${metricName}* report\n` +
-        `*Date:* ${period}\n` +
-        `*Location:* ${location}\n` +
-        `*Requested by:* ${user}\n\n` +
-        `${messageSummary}\n\n` +
-        `Here's the chart (sent by ${user}):`,
-      blocks
-    };
+          }]
+        : [{
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "*Plan your next steps:*"
+            }
+          },
+          {
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                action_id: "start_plan",
+                text: {
+                  type: "plain_text",
+                  text: "Plan My Actions",
+                  emoji: false
+                },
+                value: "placeholder"
+              },
+              {
+                type: "users_select",
+                action_id: "select_recipient",
+                placeholder: {
+                  type: "plain_text",
+                  text: sendButtonText,
+                  emoji: false
+                }
+              },
+              {
+                type: "button",
+                action_id: "send_to_selected_user",
+                text: {
+                  type: "plain_text",
+                  text: "Send Chart",
+                  emoji: false
+                },
+                style: "primary",
+                value: "placeholder"
+              }
+            ]
+          }]
+      )
+    ];
 
     const postRes = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
@@ -215,7 +193,17 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(initialPayload)
+      body: JSON.stringify({
+        channel: "C08QXCVUH6Y",
+        text:
+          `*${metricName}* report\n` +
+          `*Date:* ${period}\n` +
+          `*Location:* ${location}\n` +
+          `*Requested by:* ${user}\n\n` +
+          `${groupType !== "grouped" ? messageSummary + "\n\n" : ""}` +
+          `Here's the chart (sent by ${user}):`,
+        blocks: blocks
+      })
     });
 
     const postJson = await postRes.json();
@@ -245,8 +233,9 @@ export default async function handler(req, res) {
       performanceStatus
     });
 
-    const actionElems = blocks.find(b => b.type === "actions")?.elements;
-    if (actionElems) {
+    const updatedBlocks = blocks;
+    const actionElems = updatedBlocks.find(b => b.type === "actions")?.elements || [];
+    if (actionElems.length >= 3) {
       actionElems[0].value = fullValue;
       actionElems[2].value = fullValue;
     }
@@ -260,8 +249,8 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         channel: postJson.channel,
         ts: postJson.ts,
-        blocks,
-        text: initialPayload.text
+        blocks: updatedBlocks,
+        text: `*${metricName}* report\n*Date:* ${period}\n*Location:* ${location}\n*Requested by:* ${user}`
       })
     });
 
