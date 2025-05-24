@@ -159,22 +159,26 @@ export default async function handler(req, res) {
 
     const chartUrl = `https://quickchart.io/chart?c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
 
-    // Forward to the existing Slack message builder
-    const forwardRes = await fetch(`${req.headers.host.startsWith("localhost") ? "http" : "https"}://${req.headers.host}/api/post-slack-chart`, {
+    console.log("📤 Forwarding to /api/post-slack-chart with chart URL:", chartUrl);
+
+    const forwardRes = await fetch("https://heartbeatai.vercel.app/api/post-slack-chart", {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...payload, chart_url: chartUrl })
     });
 
+    const forwardText = await forwardRes.text();
+
     if (!forwardRes.ok) {
-      const error = await forwardRes.json();
-      throw new Error(`Failed to post to /api/post-slack-chart: ${error.message || forwardRes.statusText}`);
+      console.error("❌ Slack forwarding failed:", forwardText);
+      throw new Error(`Slack post failed: ${forwardText}`);
     }
 
+    console.log("✅ Slack chart sent successfully.");
     return res.status(200).json({ status: "sent" });
 
   } catch (err) {
     console.error("🔥 Heartbeat Direct Error:", err);
-    return res.status(500).json({ error: "Failed to send chart", detail: err.message });
+    return res.status(500).json({ error: "Slack forwarding failed", detail: err.message });
   }
 }
