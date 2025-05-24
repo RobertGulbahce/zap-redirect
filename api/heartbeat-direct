@@ -1,12 +1,23 @@
 // File: /api/heartbeat-direct.js
 
 export default async function handler(req, res) {
+  // ✅ Enable CORS for WordPress frontend
+  res.setHeader("Access-Control-Allow-Origin", "https://advanceddermatology.com.au");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end(); // Preflight success
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
 
   try {
     const payload = req.body;
+
+    console.log("📥 Incoming payload to heartbeat-direct:", payload);
 
     const {
       labels, results, target, baseline,
