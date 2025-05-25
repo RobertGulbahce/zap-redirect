@@ -162,12 +162,16 @@ export default async function handler(req, res) {
       {
   type: "context",
   elements: [
+ {
+  type: "context",
+  elements: [
     {
       type: "mrkdwn",
       text: `*Responsibility:* ${owner}`
     }
   ]
 }
+      },
       },
       {
         type: "actions",
