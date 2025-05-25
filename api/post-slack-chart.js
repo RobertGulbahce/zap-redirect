@@ -1,4 +1,5 @@
 // File: /api/post-slack-chart.js
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
@@ -87,7 +88,6 @@ export default async function handler(req, res) {
     const narrative = buildNarrative();
     const perfStatus = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
 
-    // ✅ Build chart URL with custom dimensions + API key
     const chartConfig = {
       version: "2",
       width: 900,
@@ -138,7 +138,6 @@ export default async function handler(req, res) {
 
     const chartUrl = `https://quickchart.io/chart?key=q-y4knct0mjdl0o6igbakfz5eyogjcvdz6&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
 
-    // ✅ Construct Slack blocks
     const blocks = [
       {
         type: "section",
@@ -160,17 +159,14 @@ export default async function handler(req, res) {
         }
       },
       {
-  type: "context",
-  elements: [
-{
-  type: "context",
-  elements: [
-    {
-      type: "mrkdwn",
-      text: `_Responsibility: ${owner}_`
-    }
-  ]
-},
+        type: "context",
+        elements: [
+          {
+            type: "mrkdwn",
+            text: `_Responsibility: ${owner}_`
+          }
+        ]
+      },
       {
         type: "actions",
         elements: [
@@ -227,7 +223,6 @@ export default async function handler(req, res) {
       }
     ];
 
-    // ✅ Send to Slack
     const post = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
