@@ -5,55 +5,53 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
-    console.log("📥 Incoming payload to post-slack-chart:", data);
-
-    const chartUrl = data.chart_url || "";
+    const chartUrl = data.chart_url;
     const metricName = data.title || "Untitled Metric";
     const location = data.labels || "Unknown Location";
 
-    // ✅ Simple Slack message blocks for testing
+    // ✅ Minimal Slack blocks, with validation
     const blocks = [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*✅ Minimal test message* from Heartbeat via Vercel.\nThis confirms the Slack bot, token, and channel are all working.\n\n*Metric:* " + metricName + "\n*Location:* " + location
+          text: "*✅ Minimal Slack Test Message*\nMetric: " + metricName + "\nLocation: " + location
         }
-      },
-      {
-        type: "image",
-        image_url: chartUrl,
-        alt_text: "Test chart"
       }
     ];
 
-    const postRes = await fetch("https://slack.com/api/chat.postMessage", {
+    if (chartUrl && chartUrl.startsWith("https://quickchart.io/")) {
+      blocks.push({
+        type: "image",
+        image_url: chartUrl,
+        alt_text: "Chart showing performance"
+      });
+    }
+
+    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        channel: "C08QXCVUH6Y", // Replace if testing in a different channel
-        text: `Minimal test message — ${location}`,
+        channel: "C08QXCVUH6Y",
+        text: `Heartbeat alert: ${metricName} for ${location}`, // required fallback
         blocks
       })
     });
 
-    const result = await postRes.json();
+    const result = await slackRes.json();
     console.log("📬 Slack response:", result);
 
     if (!result.ok) {
-      throw new Error(`Slack API error: ${result.error}`);
+      throw new Error(result.error);
     }
 
-    return res.status(200).json({
-      ok: true,
-      message: "Minimal chart posted to Slack successfully."
-    });
+    return res.status(200).json({ ok: true, message: "Slack test sent successfully." });
 
   } catch (err) {
-    console.error("❌ Error posting to Slack:", err);
+    console.error("❌ Slack send failed:", err);
     return res.status(500).json({ error: "Slack post failed", detail: err.message });
   }
-}  
+}
