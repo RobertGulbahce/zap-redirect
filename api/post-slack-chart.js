@@ -1,5 +1,4 @@
 // File: /api/post-slack-chart.js
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
@@ -59,7 +58,7 @@ export default async function handler(req, res) {
       return "OffTrack";
     };
 
-    const buildNarrative = () => {
+    const narrative = (() => {
       const actualF = formatValue(actual, metricType);
       const targetF = formatValue(targetNum, metricType);
       const baselineF = formatValue(baselineNum, metricType);
@@ -84,17 +83,15 @@ export default async function handler(req, res) {
 
       const status = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
       return (kpiType === "compliance" ? compliance : performance)[status];
-    };
+    })();
 
-    const narrative = buildNarrative();
     const perfStatus = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
 
-    // Chart enhancements here
     const chartConfig = {
       version: "2",
+      devicePixelRatio: 4,
       width: 900,
       height: 600,
-      devicePixelRatio: 4,
       format: "png",
       backgroundColor: "white",
       chart: {
@@ -108,7 +105,6 @@ export default async function handler(req, res) {
             borderColor: barColor,
             borderWidth: 1,
             borderRadius: 8,
-            order: 2,
             shadowOffsetX: 2,
             shadowOffsetY: 2,
             shadowBlur: 4,
@@ -133,18 +129,20 @@ export default async function handler(req, res) {
           scales: {
             xAxes: [{
               gridLines: { display: false },
-              ticks: { fontSize: 14, fontStyle: "bold", fontColor: "#333" }
+              ticks: {
+                fontSize: 14,
+                fontStyle: "bold",
+                fontColor: "#333"
+              }
             }],
             yAxes: [{
               ticks: {
                 beginAtZero: true,
                 padding: 10,
                 suggestedMax: Number(max) || undefined,
-                stepSize: metricType === "percentage" ? 10 : metricType === "dollar" ? 20000 : undefined,
+                stepSize: metricType === "percentage" ? 10 : 20000,
                 callback: function (v) {
-                  return metricType === "percentage" ? v + "%" :
-                         metricType === "dollar" ? "$" + v.toLocaleString() :
-                         v.toLocaleString();
+                  return metricType === "percentage" ? v + "%" : metricType === "dollar" ? "$" + v.toLocaleString() : v.toLocaleString();
                 }
               },
               gridLines: { color: "#f5f5f5" }
@@ -161,7 +159,7 @@ export default async function handler(req, res) {
             },
             freetext: [
               {
-                text: `Performance Status: ${performanceStatus}`,
+                text: `Performance Status: ${perfStatus}`,
                 x: 15,
                 y: 580,
                 font: {
@@ -197,15 +195,15 @@ export default async function handler(req, res) {
                   padding: { top: 4, bottom: 4, left: 6, right: 6 }
                 }
               },
-              ...(targetNum && targetNum > 0 ? [{
+              {
                 type: "line",
                 mode: "horizontal",
                 scaleID: "y-axis-0",
                 value: targetNum,
-                borderColor: "rgba(255,165,0,0.8)",
-                borderWidth: 2,
+                borderColor: targetNum ? "rgba(255,165,0,0.8)" : null,
+                borderWidth: targetNum ? 2 : 0,
                 label: {
-                  enabled: true,
+                  enabled: !!targetNum,
                   content: targetFormatted,
                   anchor: "start",
                   position: "start",
@@ -217,7 +215,7 @@ export default async function handler(req, res) {
                   borderRadius: 10,
                   padding: { top: 4, bottom: 4, left: 6, right: 6 }
                 }
-              }] : []),
+              },
               {
                 type: "box",
                 drawTime: "beforeDatasetsDraw",
@@ -265,52 +263,6 @@ export default async function handler(req, res) {
           {
             type: "mrkdwn",
             text: `*Responsibility:* ${owner}`
-          }
-        ]
-      },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            action_id: "start_plan",
-            text: { type: "plain_text", text: "Plan My Actions" },
-            value: JSON.stringify({
-              title,
-              labels,
-              results: actual,
-              target: targetNum,
-              baseline: baselineNum,
-              performanceStatus: perfStatus,
-              metric: metricType,
-              type: kpiType,
-              targetFormatted,
-              baselineFormatted,
-              owner,
-              user,
-              row,
-              period,
-              timestamp,
-              chart_url: chartUrl
-            }).slice(0, 2000)
-          },
-          {
-            type: "users_select",
-            action_id: "select_recipient",
-            placeholder: {
-              type: "plain_text",
-              text: perfStatus === "Ahead" || perfStatus === "OnTrack" ? "Share Win With Employee" : "Send to Employee"
-            }
-          },
-          {
-            type: "button",
-            action_id: "send_to_selected_user",
-            text: { type: "plain_text", text: "Send Chart" },
-            style: "primary",
-            value: JSON.stringify({
-              title,
-              chart_url: chartUrl
-            }).slice(0, 2000)
           }
         ]
       }
