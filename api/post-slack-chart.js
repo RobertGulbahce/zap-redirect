@@ -5,7 +5,7 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
-    console.log("📥 Incoming payload to post-slack-chart:", data);
+    console.log("\ud83d\udce5 Incoming payload to post-slack-chart:", data);
 
     const {
       results,
@@ -24,14 +24,16 @@ export default async function handler(req, res) {
       targetFormatted = "",
       baselineFormatted = "",
       performanceStatus = "",
-      barColor = "rgba(0,0,0,0.8)",
-      baselineBoxColor = "rgba(0,0,0,0)",
-      max = "",
+      chart_url = ""
     } = data;
 
     const actual = Number(results);
     const targetNum = target ? Number(target) : undefined;
     const baselineNum = Number(baseline);
+
+    const chartUrl = chart_url && chart_url.startsWith("https://")
+      ? chart_url
+      : `https://quickchart.io/chart?key=q-y4knct0mjdl0o6igbakfz5eyogjcvdz6&width=900&height=600&c=${encodeURIComponent(chart_url)}`;
 
     const formatValue = (value, type) => {
       if (typeof value !== 'number' || isNaN(value)) return "-";
@@ -85,87 +87,58 @@ export default async function handler(req, res) {
 
     const narrative = buildNarrative();
     const perfStatus = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
+    const sendButtonText = perfStatus === "Ahead" || perfStatus === "OnTrack"
+      ? "Share Win With Employee"
+      : "Send to Employee";
 
-    // ✅ Build chart URL with custom dimensions + API key
-    const chartConfig = {
-      version: "2",
-      width: 900,
-      height: 600,
-      format: "png",
-      backgroundColor: "white",
-      chart: {
-        type: "bar",
-        data: {
-          labels: [labels],
-          datasets: [
-            {
-              label: "Results",
-              data: [actual],
-              backgroundColor: barColor,
-              borderColor: barColor,
-              borderWidth: 1,
-              borderRadius: 8
-            }
-          ]
-        },
-        options: {
-          title: {
-            display: true,
-            text: [title, labels, ` ${data.resultsFormatted || formatValue(actual, metricType)}`, " "],
-            fontSize: 26,
-            fontStyle: "bold",
-            fontColor: "#555"
-          },
-          legend: { display: false },
-          scales: {
-            yAxes: [{
-              ticks: {
-                beginAtZero: true,
-                suggestedMax: Number(max) || undefined,
-                stepSize: 20000
-              },
-              gridLines: { color: "#f5f5f5" }
-            }],
-            xAxes: [{
-              gridLines: { display: false },
-              ticks: { fontSize: 14, fontStyle: "bold", fontColor: "#333" }
-            }]
-          }
-        }
+    const blocks = [];
+
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*${title}* for *${labels}* — shared by *${user}*`
       }
-    };
+    });
 
-    const chartUrl = `https://quickchart.io/chart?key=q-y4knct0mjdl0o6igbakfz5eyogjcvdz6&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
-
-    // ✅ Construct Slack blocks
-    const blocks = [
-      {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*${title}* for *${labels}* — shared by *${user}*`
-        }
-      },
-      {
+    if (chartUrl) {
+      blocks.push({
         type: "image",
         image_url: chartUrl,
         alt_text: `${title} chart`
-      },
-      {
+      });
+    }
+
+    if (groupType !== "grouped") {
+      blocks.push({
         type: "section",
         text: {
           type: "mrkdwn",
           text: narrative
         }
-      },
-      {
-        type: "section",
-        text: {
+      });
+    }
+
+    blocks.push({
+      type: "context",
+      elements: [
+        {
           type: "mrkdwn",
           text: `*Responsibility:* ${owner}`
         }
-      },
-      {
+      ]
+    });
+
+    if (groupType === "grouped") {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "💡 *Tip:* This chart compares multiple performers side-by-side. Click into each one individually from Heartbeat to plan actions."
+        }
+      });
+    } else {
+      blocks.push({
         type: "actions",
         elements: [
           {
@@ -192,16 +165,14 @@ export default async function handler(req, res) {
               period,
               timestamp,
               chart_url: chartUrl
-            }).slice(0, 2000)
+            })
           },
           {
             type: "users_select",
             action_id: "select_recipient",
             placeholder: {
               type: "plain_text",
-              text: perfStatus === "Ahead" || perfStatus === "OnTrack"
-                ? "Share Win With Employee"
-                : "Send to Employee"
+              text: sendButtonText
             }
           },
           {
@@ -215,13 +186,12 @@ export default async function handler(req, res) {
             value: JSON.stringify({
               title,
               chart_url: chartUrl
-            }).slice(0, 2000)
+            })
           }
         ]
-      }
-    ];
+      });
+    }
 
-    // ✅ Send to Slack
     const post = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
@@ -236,7 +206,7 @@ export default async function handler(req, res) {
     });
 
     const result = await post.json();
-    console.log("📬 Slack response:", result);
+    console.log("\ud83d\udcec Slack response:", result);
 
     if (!result.ok) {
       throw new Error(result.error);
@@ -245,7 +215,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, message: "Slack post sent successfully." });
 
   } catch (err) {
-    console.error("❌ Slack send failed:", err);
+    console.error("\u274c Slack send failed:", err);
     return res.status(500).json({ error: "Slack post failed", detail: err.message });
   }
 }
