@@ -100,7 +100,20 @@ export default async function handler(req, res) {
         ? "Share Win With Employee"
         : "Send to Employee";
 
-    const blocks = [];
+   const blocks = [
+  {
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: "*Test message* from Heartbeat via Vercel.\nThis confirms that the Slack bot, token, and channel are all working."
+    }
+  },
+  {
+    type: "image",
+    image_url: data.chart_url,
+    alt_text: "Test chart"
+  }
+];
 
     blocks.push({
       type: "section",
