@@ -163,7 +163,7 @@ export default async function handler(req, res) {
         elements: [
           {
             type: "mrkdwn",
-            text: `_Responsibility: ${owner}_`
+            text: `*Responsibility:* ${owner}`
           }
         ]
       },
