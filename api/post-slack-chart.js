@@ -4,51 +4,42 @@ export default async function handler(req, res) {
   }
 
   try {
-    const data = req.body;
-    const chartUrl = data.chart_url;
-    const metricName = data.title || "Untitled Metric";
-    const location = data.labels || "Unknown Location";
-
-    // ✅ Minimal Slack blocks, with validation
     const blocks = [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "*✅ Minimal Slack Test Message*\nMetric: " + metricName + "\nLocation: " + location
+          text: "*✅ Slack Test Successful!*\nThis is a hardcoded test message from your Vercel server."
         }
+      },
+      {
+        type: "image",
+        image_url: "https://quickchart.io/chart?c={type:'bar',data:{labels:['Test'],datasets:[{label:'Value',data:[100]}]}}",
+        alt_text: "Sample chart"
       }
     ];
 
-    if (chartUrl && chartUrl.startsWith("https://quickchart.io/")) {
-      blocks.push({
-        type: "image",
-        image_url: chartUrl,
-        alt_text: "Chart showing performance"
-      });
-    }
-
-    const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
+    const response = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        channel: "C08QXCVUH6Y",
-        text: `Heartbeat alert: ${metricName} for ${location}`, // required fallback
+        channel: "C08QXCVUH6Y", // replace if needed
+        text: "Slack test message",
         blocks
       })
     });
 
-    const result = await slackRes.json();
-    console.log("📬 Slack response:", result);
+    const json = await response.json();
+    console.log("📬 Slack response:", json);
 
-    if (!result.ok) {
-      throw new Error(result.error);
+    if (!json.ok) {
+      throw new Error(json.error);
     }
 
-    return res.status(200).json({ ok: true, message: "Slack test sent successfully." });
+    return res.status(200).json({ ok: true, message: "Test message sent to Slack." });
 
   } catch (err) {
     console.error("❌ Slack send failed:", err);
