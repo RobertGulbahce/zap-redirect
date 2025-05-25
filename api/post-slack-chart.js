@@ -1,5 +1,9 @@
+// File: /api/post-slack-chart.js
+
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Only POST allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Only POST allowed' });
+  }
 
   try {
     const data = req.body;
@@ -25,7 +29,7 @@ export default async function handler(req, res) {
       barColor = "rgba(0,0,0,0.8)",
       baselineBoxColor = "rgba(0,0,0,0)",
       max = "",
-      resultsFormatted = "",
+      resultsFormatted = ""
     } = data;
 
     const actual = Number(results);
@@ -46,6 +50,7 @@ export default async function handler(req, res) {
       if (kpiType === 'compliance' || !hasTarget) {
         return actual >= baseline ? "OnTrack" : "OffTrack";
       }
+
       const diff = (actual - target) / target;
       if (diff >= 0.1) return "Ahead";
       if (diff >= -0.05) return "OnTrack";
@@ -54,43 +59,65 @@ export default async function handler(req, res) {
       return "OffTrack";
     };
 
-    const narrativeMap = {
-      Ahead: `✅ ${labels} is ahead — ${title} climbed to ${resultsFormatted}, smashing through ${targetFormatted} and far surpassing ${baselineFormatted}.`,
-      OnTrack: `⚖️ ${labels} is on track — ${title} landed at ${resultsFormatted}, around ${targetFormatted} and above ${baselineFormatted}.`,
-      SlightlyBehind: `⚠️ ${labels} is slightly behind — ${title} came in at ${resultsFormatted}, just under ${targetFormatted} but above ${baselineFormatted}.`,
-      FallingBehind: `🔻 ${labels} is falling behind — ${title} reached ${resultsFormatted}, trailing ${targetFormatted} and near ${baselineFormatted}.`,
-      OffTrack: `🔴 ${labels} has dropped — ${title} hit ${resultsFormatted}, under both ${targetFormatted} and ${baselineFormatted}.`
+    const buildNarrative = () => {
+      const actualF = formatValue(actual, metricType);
+      const targetF = formatValue(targetNum, metricType);
+      const baselineF = formatValue(baselineNum, metricType);
+      const redLine = `the ${baselineF} red line`;
+      const goal = targetNum ? `the ${targetF} target` : null;
+
+      const performance = {
+        Ahead: `✅ ${labels} is ahead — ${title} climbed to ${actualF}, smashing through ${goal} and far surpassing ${redLine}. A great position — now’s the time to scale.`,
+        OnTrack: `⚖️ ${labels} is holding strong — ${title} landed at ${actualF}, right around ${goal} and comfortably above ${redLine}. Consistency is good — but now’s the time to push further.`,
+        SlightlyBehind: `⚠️ ${labels} is slightly behind — ${title} came in at ${actualF}, just under ${goal} but still above ${redLine}. A small shift in focus can turn this around.`,
+        FallingBehind: `🔻 ${labels} is falling behind — ${title} reached ${actualF}, trailing both ${goal} and hovering just above ${redLine}. Let's take action to avoid slipping further.`,
+        OffTrack: `🔴 ${labels} has fallen below critical thresholds — ${title} hit ${actualF}, underperforming ${goal} and slipping beneath ${redLine}. It’s time for immediate intervention.`
+      };
+
+      const compliance = {
+        Ahead: `✅ ${labels} is exceeding expectations — ${title} reached ${actualF}, well above ${goal} and safely past ${redLine}. Great discipline — keep it steady.`,
+        OnTrack: `📘 ${labels} is compliant — ${title} came in at ${actualF}, meeting ${goal} and comfortably above ${redLine}. Stay consistent.`,
+        SlightlyBehind: `⚠️ ${labels} is edging close to limits — ${title} is at ${actualF}, below ${goal} but still above ${redLine}. A quick correction can restore compliance.`,
+        FallingBehind: `🚧 ${labels} is out of bounds — ${title} is ${actualF}, trailing ${goal} and hovering near ${redLine}. Attention is needed before it worsens.`,
+        OffTrack: `⛔️ ${labels} is below compliance — ${title} dropped to ${actualF}, under both ${goal} and ${redLine}. Standards have not been met — this requires urgent correction.`
+      };
+
+      const status = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
+      return (kpiType === "compliance" ? compliance : performance)[status];
     };
 
+    const narrative = buildNarrative();
     const perfStatus = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
-    const narrative = narrativeMap[perfStatus];
 
+    // Shorten chart URL with QuickChart
     const chartConfig = {
       version: "2",
       width: 900,
       height: 600,
       format: "png",
-      backgroundColor: "white",
       devicePixelRatio: 4,
+      backgroundColor: "white",
       chart: {
         type: "bar",
         data: {
           labels: [labels],
-          datasets: [{
-            label: "Results",
-            data: [actual],
-            backgroundColor: barColor,
-            borderColor: barColor,
-            borderWidth: 1,
-            borderRadius: 8,
-            shadowOffsetX: 2,
-            shadowOffsetY: 2,
-            shadowBlur: 4,
-            shadowColor: "rgba(0,0,0,0.10)",
-            barPercentage: 0.6,
-            categoryPercentage: 0.8,
-            order: 2
-          }]
+          datasets: [
+            {
+              label: "Results",
+              data: [actual],
+              backgroundColor: barColor,
+              borderColor: barColor,
+              order: 2,
+              borderWidth: 1,
+              borderRadius: 8,
+              shadowOffsetX: 2,
+              shadowOffsetY: 2,
+              shadowBlur: 4,
+              shadowColor: "rgba(0,0,0,0.10)",
+              barPercentage: 0.6,
+              categoryPercentage: 0.8
+            }
+          ]
         },
         options: {
           responsive: true,
@@ -99,7 +126,7 @@ export default async function handler(req, res) {
           },
           title: {
             display: true,
-            text: [title, labels, ` ${resultsFormatted}`, " "],
+            text: [title, labels, ` ${resultsFormatted || formatValue(actual, metricType)}`, " "],
             fontSize: 26,
             fontStyle: "bold",
             fontColor: "#555"
@@ -108,14 +135,18 @@ export default async function handler(req, res) {
           scales: {
             xAxes: [{
               gridLines: { display: false },
-              ticks: { fontSize: 14, fontStyle: "bold", fontColor: "#333" }
+              ticks: {
+                fontSize: 14,
+                fontStyle: "bold",
+                fontColor: "#333"
+              }
             }],
             yAxes: [{
               ticks: {
                 beginAtZero: true,
                 padding: 10,
                 suggestedMax: Number(max) || undefined,
-                stepSize: metricType === "dollar" ? 20000 : undefined,
+                stepSize: metricType === "percentage" ? 10 : metricType === "dollar" ? 20000 : undefined,
                 callback: (v) => {
                   if (metricType === "percentage") return `${v}%`;
                   if (metricType === "dollar") return `$${v.toLocaleString()}`;
@@ -134,14 +165,16 @@ export default async function handler(req, res) {
               clip: true,
               formatter: () => resultsFormatted
             },
-            freetext: [{
-              text: `Performance Status: ${performanceStatus}`,
-              x: 15,
-              y: 580,
-              font: { size: 12, family: "Arial", weight: "normal" },
-              color: "#666",
-              align: "start"
-            }]
+            freetext: [
+              {
+                text: `Performance Status: ${performanceStatus}`,
+                x: 15,
+                y: 580,
+                font: { size: 12, family: "Arial", weight: "normal" },
+                color: "#666",
+                align: "start"
+              }
+            ]
           },
           annotation: {
             annotations: [
@@ -166,29 +199,27 @@ export default async function handler(req, res) {
                   padding: { top: 4, bottom: 4, left: 6, right: 6 }
                 }
               },
-              ...(targetNum
-                ? [{
-                    type: "line",
-                    mode: "horizontal",
-                    scaleID: "y-axis-0",
-                    value: targetNum,
-                    borderColor: "rgba(255,165,0,0.8)",
-                    borderWidth: 2,
-                    label: {
-                      enabled: true,
-                      content: targetFormatted,
-                      anchor: "start",
-                      position: "start",
-                      xAdjust: -244,
-                      yAdjust: -15,
-                      backgroundColor: "rgba(255,165,0,0.85)",
-                      fontColor: "#fff",
-                      fontSize: 14,
-                      borderRadius: 10,
-                      padding: { top: 4, bottom: 4, left: 6, right: 6 }
-                    }
-                  }]
-                : []),
+              {
+                type: "line",
+                mode: "horizontal",
+                scaleID: "y-axis-0",
+                value: targetNum,
+                borderColor: targetNum ? "rgba(255,165,0,0.8)" : undefined,
+                borderWidth: targetNum ? 2 : 0,
+                label: {
+                  enabled: !!targetNum,
+                  content: targetFormatted,
+                  anchor: "start",
+                  position: "start",
+                  xAdjust: -244,
+                  yAdjust: -15,
+                  backgroundColor: "rgba(255,165,0,0.85)",
+                  fontColor: "#fff",
+                  fontSize: 14,
+                  borderRadius: 10,
+                  padding: { top: 4, bottom: 4, left: 6, right: 6 }
+                }
+              },
               {
                 type: "box",
                 drawTime: "beforeDatasetsDraw",
@@ -205,7 +236,13 @@ export default async function handler(req, res) {
       }
     };
 
-    const chartUrl = `https://quickchart.io/chart?key=q-y4knct0mjdl0o6igbakfz5eyogjcvdz6&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
+    const shortenRes = await fetch("https://quickchart.io/chart/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(chartConfig)
+    });
+    const shortenData = await shortenRes.json();
+    const chartUrl = shortenData?.url;
 
     const blocks = [
       {
@@ -225,50 +262,23 @@ export default async function handler(req, res) {
       },
       {
         type: "section",
-        text: { type: "mrkdwn", text: narrative }
+        text: {
+          type: "mrkdwn",
+          text: narrative
+        }
       },
       {
         type: "context",
         elements: [
-          { type: "mrkdwn", text: `_Responsibility: ${owner}_` }
-        ]
-      },
-      {
-        type: "actions",
-        elements: [
           {
-            type: "button",
-            action_id: "start_plan",
-            text: { type: "plain_text", text: "Plan My Actions" },
-            value: JSON.stringify({
-              title, labels, results: actual, target: targetNum, baseline: baselineNum,
-              performanceStatus: perfStatus, metric: metricType, type: kpiType,
-              targetFormatted, baselineFormatted, owner, user, row, period,
-              timestamp, chart_url: chartUrl
-            }).slice(0, 2000)
-          },
-          {
-            type: "users_select",
-            action_id: "select_recipient",
-            placeholder: {
-              type: "plain_text",
-              text: perfStatus === "Ahead" || perfStatus === "OnTrack"
-                ? "Share Win With Employee"
-                : "Send to Employee"
-            }
-          },
-          {
-            type: "button",
-            action_id: "send_to_selected_user",
-            text: { type: "plain_text", text: "Send Chart" },
-            style: "primary",
-            value: JSON.stringify({ title, chart_url: chartUrl }).slice(0, 2000)
+            type: "mrkdwn",
+            text: `*Responsibility:* ${owner}`
           }
         ]
       }
     ];
 
-    const post = await fetch("https://slack.com/api/chat.postMessage", {
+    const result = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
@@ -281,14 +291,16 @@ export default async function handler(req, res) {
       })
     });
 
-    const result = await post.json();
-    console.log("📬 Slack response:", result);
-    if (!result.ok) throw new Error(result.error);
+    const json = await result.json();
+    console.log("📬 Slack response:", json);
 
-    return res.status(200).json({ ok: true, message: "Slack post sent successfully." });
+    if (!json.ok) {
+      throw new Error(json.error);
+    }
 
+    res.status(200).json({ ok: true, message: "Slack post sent successfully." });
   } catch (err) {
     console.error("❌ Slack send failed:", err);
-    return res.status(500).json({ error: "Slack post failed", detail: err.message });
+    res.status(500).json({ error: "Slack post failed", detail: err.message });
   }
-}  
+}
