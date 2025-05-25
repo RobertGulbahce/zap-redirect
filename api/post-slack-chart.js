@@ -7,7 +7,6 @@ export default async function handler(req, res) {
     const data = req.body;
     console.log("📥 Incoming payload to post-slack-chart:", data);
 
-    // 🔢 Extract + parse
     const {
       results,
       target,
@@ -19,35 +18,36 @@ export default async function handler(req, res) {
       owner,
       row,
       timestamp,
-      chart_url,
       metricType = "count",
       groupType = "",
       kpiType = "",
       targetFormatted = "",
       baselineFormatted = "",
-      performanceStatus = ""
+      performanceStatus = "",
+      barColor = "rgba(0,0,0,0.8)",
+      baselineBoxColor = "rgba(0,0,0,0)",
+      max = "",
     } = data;
 
     const actual = Number(results);
     const targetNum = target ? Number(target) : undefined;
     const baselineNum = Number(baseline);
-    const chartUrl = chart_url && chart_url.startsWith("https://") ? chart_url : "";
 
-    // 🧠 Utils
-    const truncate = (str, max) => str.length > max ? str.slice(0, max - 3) + "..." : str;
-
-    const formatValue = (val, type) => {
-      if (typeof val !== 'number' || isNaN(val)) return "-";
+    const formatValue = (value, type) => {
+      if (typeof value !== 'number' || isNaN(value)) return "-";
       switch (type) {
-        case "percentage": return `${Math.round(val)}%`;
-        case "dollar": return `$${Math.round(val).toLocaleString()}`;
-        default: return `${Math.round(val).toLocaleString()}`;
+        case "percentage": return `${Math.round(value)}%`;
+        case "dollar": return `$${Math.round(value).toLocaleString()}`;
+        default: return `${Math.round(value).toLocaleString()}`;
       }
     };
 
     const getPerformanceStatus = (actual, target, baseline, kpiType) => {
       const hasTarget = typeof target === 'number' && !isNaN(target) && target > 0;
-      if (kpiType === 'compliance' || !hasTarget) return actual >= baseline ? "OnTrack" : "OffTrack";
+      if (kpiType === 'compliance' || !hasTarget) {
+        return actual >= baseline ? "OnTrack" : "OffTrack";
+      }
+
       const diff = (actual - target) / target;
       if (diff >= 0.1) return "Ahead";
       if (diff >= -0.05) return "OnTrack";
@@ -85,32 +85,59 @@ export default async function handler(req, res) {
 
     const narrative = buildNarrative();
     const perfStatus = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
-    const sendButtonText = perfStatus === "Ahead" || perfStatus === "OnTrack"
-      ? "Share Win With Employee"
-      : "Send to Employee";
 
-    // ✅ Truncate chart URL and values
-    const shortChartUrl = truncate(chartUrl, 2900);
+    // ✅ Build chart URL with custom dimensions + API key
+    const chartConfig = {
+      version: "2",
+      width: 900,
+      height: 600,
+      format: "png",
+      backgroundColor: "white",
+      chart: {
+        type: "bar",
+        data: {
+          labels: [labels],
+          datasets: [
+            {
+              label: "Results",
+              data: [actual],
+              backgroundColor: barColor,
+              borderColor: barColor,
+              borderWidth: 1,
+              borderRadius: 8
+            }
+          ]
+        },
+        options: {
+          title: {
+            display: true,
+            text: [title, labels, ` ${data.resultsFormatted || formatValue(actual, metricType)}`, " "],
+            fontSize: 26,
+            fontStyle: "bold",
+            fontColor: "#555"
+          },
+          legend: { display: false },
+          scales: {
+            yAxes: [{
+              ticks: {
+                beginAtZero: true,
+                suggestedMax: Number(max) || undefined,
+                stepSize: 20000
+              },
+              gridLines: { color: "#f5f5f5" }
+            }],
+            xAxes: [{
+              gridLines: { display: false },
+              ticks: { fontSize: 14, fontStyle: "bold", fontColor: "#333" }
+            }]
+          }
+        }
+      }
+    };
 
-    const actionValue = truncate(JSON.stringify({
-      title,
-      labels,
-      results: actual,
-      target: targetNum,
-      baseline: baselineNum,
-      performanceStatus: perfStatus,
-      metric: metricType,
-      type: kpiType,
-      targetFormatted,
-      baselineFormatted,
-      owner,
-      user,
-      row,
-      period,
-      timestamp,
-      chart_url: shortChartUrl
-    }), 1900);
+    const chartUrl = `https://quickchart.io/chart?key=q-y4knct0mjdl0o6igbakfz5eyogjcvdz6&c=${encodeURIComponent(JSON.stringify(chartConfig))}`;
 
+    // ✅ Construct Slack blocks
     const blocks = [
       {
         type: "section",
@@ -121,13 +148,16 @@ export default async function handler(req, res) {
       },
       {
         type: "image",
-        image_url: shortChartUrl,
+        image_url: chartUrl,
         alt_text: `${title} chart`
       },
-      ...(groupType !== "grouped" ? [{
+      {
         type: "section",
-        text: { type: "mrkdwn", text: narrative }
-      }] : []),
+        text: {
+          type: "mrkdwn",
+          text: narrative
+        }
+      },
       {
         type: "section",
         text: {
@@ -135,45 +165,60 @@ export default async function handler(req, res) {
           text: `*Responsibility:* ${owner}`
         }
       },
-      ...(groupType === "grouped"
-        ? [{
-            type: "section",
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            action_id: "start_plan",
             text: {
-              type: "mrkdwn",
-              text: "💡 *Tip:* This chart compares multiple performers side-by-side. Click into each one individually from Heartbeat to plan actions."
-            }
-          }]
-        : [{
-            type: "section",
-            text: { type: "mrkdwn", text: "*Plan your next steps:*" }
+              type: "plain_text",
+              text: "Plan My Actions"
+            },
+            value: JSON.stringify({
+              title,
+              labels,
+              results: actual,
+              target: targetNum,
+              baseline: baselineNum,
+              performanceStatus: perfStatus,
+              metric: metricType,
+              type: kpiType,
+              targetFormatted,
+              baselineFormatted,
+              owner,
+              user,
+              row,
+              period,
+              timestamp,
+              chart_url: chartUrl
+            }).slice(0, 2000)
           },
           {
-            type: "actions",
-            elements: [
-              {
-                type: "button",
-                action_id: "start_plan",
-                text: { type: "plain_text", text: "Plan My Actions" },
-                value: actionValue
-              },
-              {
-                type: "users_select",
-                action_id: "select_recipient",
-                placeholder: { type: "plain_text", text: sendButtonText }
-              },
-              {
-                type: "button",
-                action_id: "send_to_selected_user",
-                text: { type: "plain_text", text: "Send Chart" },
-                style: "primary",
-                value: JSON.stringify({
-                  title,
-                  chart_url: shortChartUrl
-                }).slice(0, 1900)
-              }
-            ]
-          }]
-      )
+            type: "users_select",
+            action_id: "select_recipient",
+            placeholder: {
+              type: "plain_text",
+              text: perfStatus === "Ahead" || perfStatus === "OnTrack"
+                ? "Share Win With Employee"
+                : "Send to Employee"
+            }
+          },
+          {
+            type: "button",
+            action_id: "send_to_selected_user",
+            text: {
+              type: "plain_text",
+              text: "Send Chart"
+            },
+            style: "primary",
+            value: JSON.stringify({
+              title,
+              chart_url: chartUrl
+            }).slice(0, 2000)
+          }
+        ]
+      }
     ];
 
     // ✅ Send to Slack
@@ -185,7 +230,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         channel: "C08QXCVUH6Y",
-        text: `Report: ${title} (${labels})`, // fallback
+        text: `Report: ${title} (${labels})`,
         blocks
       })
     });
@@ -203,4 +248,4 @@ export default async function handler(req, res) {
     console.error("❌ Slack send failed:", err);
     return res.status(500).json({ error: "Slack post failed", detail: err.message });
   }
-}  
+}
