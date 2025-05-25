@@ -88,50 +88,49 @@ export default async function handler(req, res) {
     const narrative = buildNarrative();
     const perfStatus = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
 
+    // ✅ FIXED: Flattened chart config (no "chart" key)
     const chartConfig = {
       version: "2",
       width: 900,
       height: 600,
       format: "png",
       backgroundColor: "white",
-      chart: {
-        type: "bar",
-        data: {
-          labels: [labels],
-          datasets: [
-            {
-              label: "Results",
-              data: [actual],
-              backgroundColor: barColor,
-              borderColor: barColor,
-              borderWidth: 1,
-              borderRadius: 8
-            }
-          ]
-        },
-        options: {
-          title: {
-            display: true,
-            text: [title, labels, ` ${data.resultsFormatted || formatValue(actual, metricType)}`, " "],
-            fontSize: 26,
-            fontStyle: "bold",
-            fontColor: "#555"
-          },
-          legend: { display: false },
-          scales: {
-            yAxes: [{
-              ticks: {
-                beginAtZero: true,
-                suggestedMax: Number(max) || undefined,
-                stepSize: 20000
-              },
-              gridLines: { color: "#f5f5f5" }
-            }],
-            xAxes: [{
-              gridLines: { display: false },
-              ticks: { fontSize: 14, fontStyle: "bold", fontColor: "#333" }
-            }]
+      type: "bar",
+      data: {
+        labels: [labels],
+        datasets: [
+          {
+            label: "Results",
+            data: [actual],
+            backgroundColor: barColor,
+            borderColor: barColor,
+            borderWidth: 1,
+            borderRadius: 8
           }
+        ]
+      },
+      options: {
+        title: {
+          display: true,
+          text: [title, labels, ` ${data.resultsFormatted || formatValue(actual, metricType)}`, " "],
+          fontSize: 26,
+          fontStyle: "bold",
+          fontColor: "#555"
+        },
+        legend: { display: false },
+        scales: {
+          yAxes: [{
+            ticks: {
+              beginAtZero: true,
+              suggestedMax: Number(max) || undefined,
+              stepSize: 20000
+            },
+            gridLines: { color: "#f5f5f5" }
+          }],
+          xAxes: [{
+            gridLines: { display: false },
+            ticks: { fontSize: 14, fontStyle: "bold", fontColor: "#333" }
+          }]
         }
       }
     };
@@ -141,12 +140,12 @@ export default async function handler(req, res) {
     const blocks = [
       {
         type: "section",
-  text: {
-    type: "mrkdwn",
-    text:
-      `:bar_chart: *${title} report for ${labels}*\n` +
-      `*Period:* ${period}\n` +
-      `*Requested by:* ${user}`
+        text: {
+          type: "mrkdwn",
+          text:
+            `:bar_chart: *${title} report for ${labels}*\n` +
+            `*Period:* ${period}\n` +
+            `*Requested by:* ${user}`
         }
       },
       {
