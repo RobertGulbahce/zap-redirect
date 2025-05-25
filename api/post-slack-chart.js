@@ -88,118 +88,88 @@ export default async function handler(req, res) {
       ? "Share Win With Employee"
       : "Send to Employee";
 
-    const blocks = [];
-
-    // Heading
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*${title}* for *${labels}* — shared by *${user}*`
-      }
-    });
-
-    // Chart image
-    if (chartUrl) {
-      blocks.push({
+    const blocks = [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `📊 *${title}* report for *${labels}*\n\n*Period:* ${period}\n*Requested by:* ${user}`
+        }
+      },
+      {
         type: "image",
         image_url: chartUrl,
         alt_text: `${title} chart`
-      });
-    }
-
-    // Narrative
-    if (groupType !== "grouped") {
-      blocks.push({
+      },
+      {
         type: "section",
         text: {
           type: "mrkdwn",
           text: narrative
         }
-      });
-    }
-
-    // Responsibility
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*Responsibility:* ${owner}`
-      }
-    });
-
-    // Tip or Actions
-    if (groupType === "grouped") {
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: "💡 *Tip:* This chart compares multiple performers side-by-side. Click into each one individually from Heartbeat to plan actions."
-        }
-      });
-    } else {
-      blocks.push(
-        {
-          type: "section",
-          text: {
+      },
+      {
+        type: "context",
+        elements: [
+          {
             type: "mrkdwn",
-            text: "*Plan your next steps:*"
+            text: `*Responsibility:* ${owner}`
           }
-        },
-        {
-          type: "actions",
-          elements: [
-            {
-              type: "button",
-              action_id: "start_plan",
-              text: {
-                type: "plain_text",
-                text: "Plan My Actions"
-              },
-              value: JSON.stringify({
-                title,
-                labels,
-                results: actual,
-                target: targetNum,
-                baseline: baselineNum,
-                performanceStatus: perfStatus,
-                metric: metricType,
-                type: kpiType,
-                targetFormatted,
-                baselineFormatted,
-                owner,
-                user,
-                row,
-                period,
-                timestamp,
-                chart_url: chartUrl
-              })
+        ]
+      },
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Plan My Actions"
             },
-            {
-              type: "users_select",
-              action_id: "select_recipient",
-              placeholder: {
-                type: "plain_text",
-                text: sendButtonText
-              }
-            },
-            {
-              type: "button",
-              action_id: "send_to_selected_user",
-              text: {
-                type: "plain_text",
-                text: "Send Chart"
-              },
-              style: "primary",
-              value: JSON.stringify({
-                title,
-                chart_url: chartUrl
-              })
+            action_id: "start_plan",
+            value: JSON.stringify({
+              title,
+              labels,
+              results: actual,
+              target: targetNum,
+              baseline: baselineNum,
+              performanceStatus: perfStatus,
+              metric: metricType,
+              type: kpiType,
+              targetFormatted,
+              baselineFormatted,
+              owner,
+              user,
+              row,
+              period,
+              timestamp,
+              chart_url: chartUrl
+            })
+          },
+          {
+            type: "users_select",
+            action_id: "select_recipient",
+            placeholder: {
+              type: "plain_text",
+              text: sendButtonText
             }
-          ]
-        }
-      );
-    }
+          },
+          {
+            type: "button",
+            text: {
+              type: "plain_text",
+              text: "Send Chart"
+            },
+            style: "primary",
+            action_id: "send_to_selected_user",
+            value: JSON.stringify({
+              title,
+              chart_url: chartUrl
+            })
+          }
+        ]
+      }
+    ];
 
     const post = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
@@ -209,7 +179,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         channel: "C08QXCVUH6Y",
-        text: `Report: ${title} (${labels})`, // required fallback
+        text: `Report: ${title} (${labels})`, // fallback
         blocks
       })
     });
