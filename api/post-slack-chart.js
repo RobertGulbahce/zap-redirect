@@ -7,6 +7,7 @@ export default async function handler(req, res) {
     const data = req.body;
     console.log("📥 Incoming payload to post-slack-chart:", data);
 
+    // 🔢 Extract + parse
     const {
       results,
       target,
@@ -30,23 +31,23 @@ export default async function handler(req, res) {
     const actual = Number(results);
     const targetNum = target ? Number(target) : undefined;
     const baselineNum = Number(baseline);
-    const chartUrl = chart_url && chart_url.startsWith("https://") ? chart_url : undefined;
+    const chartUrl = chart_url && chart_url.startsWith("https://") ? chart_url : "";
 
-    const formatValue = (value, type) => {
-      if (typeof value !== 'number' || isNaN(value)) return "-";
+    // 🧠 Utils
+    const truncate = (str, max) => str.length > max ? str.slice(0, max - 3) + "..." : str;
+
+    const formatValue = (val, type) => {
+      if (typeof val !== 'number' || isNaN(val)) return "-";
       switch (type) {
-        case "percentage": return `${Math.round(value)}%`;
-        case "dollar": return `$${Math.round(value).toLocaleString()}`;
-        default: return `${Math.round(value).toLocaleString()}`;
+        case "percentage": return `${Math.round(val)}%`;
+        case "dollar": return `$${Math.round(val).toLocaleString()}`;
+        default: return `${Math.round(val).toLocaleString()}`;
       }
     };
 
     const getPerformanceStatus = (actual, target, baseline, kpiType) => {
       const hasTarget = typeof target === 'number' && !isNaN(target) && target > 0;
-      if (kpiType === 'compliance' || !hasTarget) {
-        return actual >= baseline ? "OnTrack" : "OffTrack";
-      }
-
+      if (kpiType === 'compliance' || !hasTarget) return actual >= baseline ? "OnTrack" : "OffTrack";
       const diff = (actual - target) / target;
       if (diff >= 0.1) return "Ahead";
       if (diff >= -0.05) return "OnTrack";
@@ -88,89 +89,94 @@ export default async function handler(req, res) {
       ? "Share Win With Employee"
       : "Send to Employee";
 
+    // ✅ Truncate chart URL and values
+    const shortChartUrl = truncate(chartUrl, 2900);
+
+    const actionValue = truncate(JSON.stringify({
+      title,
+      labels,
+      results: actual,
+      target: targetNum,
+      baseline: baselineNum,
+      performanceStatus: perfStatus,
+      metric: metricType,
+      type: kpiType,
+      targetFormatted,
+      baselineFormatted,
+      owner,
+      user,
+      row,
+      period,
+      timestamp,
+      chart_url: shortChartUrl
+    }), 1900);
+
     const blocks = [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `📊 *${title}* report for *${labels}*\n\n*Period:* ${period}\n*Requested by:* ${user}`
+          text: `*${title}* for *${labels}* — shared by *${user}*`
         }
       },
       {
         type: "image",
-        image_url: chartUrl,
+        image_url: shortChartUrl,
         alt_text: `${title} chart`
       },
+      ...(groupType !== "grouped" ? [{
+        type: "section",
+        text: { type: "mrkdwn", text: narrative }
+      }] : []),
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: narrative
+          text: `*Responsibility:* ${owner}`
         }
       },
-      {
-        type: "context",
-        elements: [
-          {
-            type: "mrkdwn",
-            text: `*Responsibility:* ${owner}`
-          }
-        ]
-      },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
+      ...(groupType === "grouped"
+        ? [{
+            type: "section",
             text: {
-              type: "plain_text",
-              text: "Plan My Actions"
-            },
-            action_id: "start_plan",
-            value: JSON.stringify({
-              title,
-              labels,
-              results: actual,
-              target: targetNum,
-              baseline: baselineNum,
-              performanceStatus: perfStatus,
-              metric: metricType,
-              type: kpiType,
-              targetFormatted,
-              baselineFormatted,
-              owner,
-              user,
-              row,
-              period,
-              timestamp,
-              chart_url: chartUrl
-            })
-          },
-          {
-            type: "users_select",
-            action_id: "select_recipient",
-            placeholder: {
-              type: "plain_text",
-              text: sendButtonText
+              type: "mrkdwn",
+              text: "💡 *Tip:* This chart compares multiple performers side-by-side. Click into each one individually from Heartbeat to plan actions."
             }
+          }]
+        : [{
+            type: "section",
+            text: { type: "mrkdwn", text: "*Plan your next steps:*" }
           },
           {
-            type: "button",
-            text: {
-              type: "plain_text",
-              text: "Send Chart"
-            },
-            style: "primary",
-            action_id: "send_to_selected_user",
-            value: JSON.stringify({
-              title,
-              chart_url: chartUrl
-            })
-          }
-        ]
-      }
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                action_id: "start_plan",
+                text: { type: "plain_text", text: "Plan My Actions" },
+                value: actionValue
+              },
+              {
+                type: "users_select",
+                action_id: "select_recipient",
+                placeholder: { type: "plain_text", text: sendButtonText }
+              },
+              {
+                type: "button",
+                action_id: "send_to_selected_user",
+                text: { type: "plain_text", text: "Send Chart" },
+                style: "primary",
+                value: JSON.stringify({
+                  title,
+                  chart_url: shortChartUrl
+                }).slice(0, 1900)
+              }
+            ]
+          }]
+      )
     ];
 
+    // ✅ Send to Slack
     const post = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
@@ -197,4 +203,4 @@ export default async function handler(req, res) {
     console.error("❌ Slack send failed:", err);
     return res.status(500).json({ error: "Slack post failed", detail: err.message });
   }
-}
+}  
