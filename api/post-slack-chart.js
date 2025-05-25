@@ -1,5 +1,3 @@
-// File: /api/post-slack-chart.js
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
@@ -89,13 +87,13 @@ export default async function handler(req, res) {
     const narrative = buildNarrative();
     const perfStatus = getPerformanceStatus(actual, targetNum, baselineNum, kpiType);
 
-    // Shorten chart URL with QuickChart
+    // Build QuickChart config (Zapier style)
     const chartConfig = {
       version: "2",
+      devicePixelRatio: 4,
       width: 900,
       height: 600,
       format: "png",
-      devicePixelRatio: 4,
       backgroundColor: "white",
       chart: {
         type: "bar",
@@ -107,7 +105,6 @@ export default async function handler(req, res) {
               data: [actual],
               backgroundColor: barColor,
               borderColor: barColor,
-              order: 2,
               borderWidth: 1,
               borderRadius: 8,
               shadowOffsetX: 2,
@@ -115,7 +112,8 @@ export default async function handler(req, res) {
               shadowBlur: 4,
               shadowColor: "rgba(0,0,0,0.10)",
               barPercentage: 0.6,
-              categoryPercentage: 0.8
+              categoryPercentage: 0.8,
+              order: 2
             }
           ]
         },
@@ -135,21 +133,17 @@ export default async function handler(req, res) {
           scales: {
             xAxes: [{
               gridLines: { display: false },
-              ticks: {
-                fontSize: 14,
-                fontStyle: "bold",
-                fontColor: "#333"
-              }
+              ticks: { fontSize: 14, fontStyle: "bold", fontColor: "#333" }
             }],
             yAxes: [{
               ticks: {
                 beginAtZero: true,
                 padding: 10,
                 suggestedMax: Number(max) || undefined,
-                stepSize: metricType === "percentage" ? 10 : metricType === "dollar" ? 20000 : undefined,
+                stepSize: metricType === "percentage" ? 10 : 20000,
                 callback: (v) => {
-                  if (metricType === "percentage") return `${v}%`;
-                  if (metricType === "dollar") return `$${v.toLocaleString()}`;
+                  if (metricType === "percentage") return v + "%";
+                  if (metricType === "dollar") return "$" + v.toLocaleString();
                   return v.toLocaleString();
                 }
               },
@@ -204,7 +198,7 @@ export default async function handler(req, res) {
                 mode: "horizontal",
                 scaleID: "y-axis-0",
                 value: targetNum,
-                borderColor: targetNum ? "rgba(255,165,0,0.8)" : undefined,
+                borderColor: targetNum ? "rgba(255,165,0,0.8)" : null,
                 borderWidth: targetNum ? 2 : 0,
                 label: {
                   enabled: !!targetNum,
@@ -236,13 +230,14 @@ export default async function handler(req, res) {
       }
     };
 
-    const shortenRes = await fetch("https://quickchart.io/chart/create", {
+    const shorten = await fetch("https://quickchart.io/chart/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(chartConfig)
     });
-    const shortenData = await shortenRes.json();
-    const chartUrl = shortenData?.url;
+
+    const shortenResult = await shorten.json();
+    const chartUrl = shortenResult.url;
 
     const blocks = [
       {
@@ -275,10 +270,65 @@ export default async function handler(req, res) {
             text: `*Responsibility:* ${owner}`
           }
         ]
+      },
+      {
+        type: "actions",
+        elements: [
+          {
+            type: "button",
+            action_id: "start_plan",
+            text: {
+              type: "plain_text",
+              text: "Plan My Actions"
+            },
+            value: JSON.stringify({
+              title,
+              labels,
+              results: actual,
+              target: targetNum,
+              baseline: baselineNum,
+              performanceStatus: perfStatus,
+              metric: metricType,
+              type: kpiType,
+              targetFormatted,
+              baselineFormatted,
+              owner,
+              user,
+              row,
+              period,
+              timestamp,
+              chart_url: chartUrl
+            }).slice(0, 2000)
+          },
+          {
+            type: "users_select",
+            action_id: "select_recipient",
+            placeholder: {
+              type: "plain_text",
+              text:
+                perfStatus === "Ahead" || perfStatus === "OnTrack"
+                  ? "Share Win With Employee"
+                  : "Send to Employee"
+            }
+          },
+          {
+            type: "button",
+            action_id: "send_to_selected_user",
+            text: {
+              type: "plain_text",
+              text: "Send Chart"
+            },
+            style: "primary",
+            value: JSON.stringify({
+              title,
+              chart_url: chartUrl
+            }).slice(0, 2000)
+          }
+        ]
       }
     ];
 
-    const result = await fetch("https://slack.com/api/chat.postMessage", {
+    const post = await fetch("https://slack.com/api/chat.postMessage", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
@@ -291,16 +341,17 @@ export default async function handler(req, res) {
       })
     });
 
-    const json = await result.json();
-    console.log("📬 Slack response:", json);
+    const result = await post.json();
+    console.log("📬 Slack response:", result);
 
-    if (!json.ok) {
-      throw new Error(json.error);
+    if (!result.ok) {
+      throw new Error(result.error);
     }
 
-    res.status(200).json({ ok: true, message: "Slack post sent successfully." });
+    return res.status(200).json({ ok: true, message: "Slack post sent successfully." });
+
   } catch (err) {
     console.error("❌ Slack send failed:", err);
-    res.status(500).json({ error: "Slack post failed", detail: err.message });
+    return res.status(500).json({ error: "Slack post failed", detail: err.message });
   }
 }
