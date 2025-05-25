@@ -141,9 +141,12 @@ export default async function handler(req, res) {
     const blocks = [
       {
         type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*${title}* for *${labels}* — shared by *${user}*`
+  text: {
+    type: "mrkdwn",
+    text:
+      `:bar_chart: *${title} report for ${labels}*\n` +
+      `*Period:* ${period}\n` +
+      `*Requested by:* ${user}`
         }
       },
       {
