@@ -160,11 +160,14 @@ export default async function handler(req, res) {
         }
       },
       {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Responsibility:* ${owner}`
-        }
+  type: "context",
+  elements: [
+    {
+      type: "mrkdwn",
+      text: `*Responsibility:* ${owner}`
+    }
+  ]
+}
       },
       {
         type: "actions",
